@@ -16,6 +16,7 @@ from dataclasses import dataclass, asdict
 from enum import Enum
 from dotenv import load_dotenv
 from asset_agent import AssetAgent, set_asset_quiet_mode
+from ad_agent import AdCreationAgent, set_ad_quiet_mode
 
 
 # ============================================================================
@@ -464,6 +465,7 @@ class OrchestratorAgent:
         self.api = MetaAPIClient(access_token)
         self.campaign_agent = CampaignAgent(self.api)
         self.asset_agent = AssetAgent(self.api)
+        self.ad_agent = AdCreationAgent(self.api)
         log_debug("[Orchestrator] Initialized with Campaign Agent and Asset Agent")
     
     async def validate_credentials(self, ad_account_id: str) -> bool:
@@ -476,6 +478,20 @@ class OrchestratorAgent:
         except Exception as e:
             log_debug(f"[Orchestrator] Credential validation failed: {e}")
             return False
+    
+    async def list_ad_accounts(self) -> List[Dict[str, Any]]:
+        """List all ad accounts accessible with current access token"""
+        log_debug(f"\n[Orchestrator] Listing ad accounts")
+        endpoint = "/me/adaccounts"
+        params = {"fields": "id,name,account_status,created_time,currency,timezone_name"}
+        try:
+            response = await self.api.get(endpoint, params=params)
+            accounts = response.get("data", [])
+            log_debug(f"[Orchestrator] Found {len(accounts)} ad account(s)")
+            return accounts
+        except Exception as e:
+            log_debug(f"[Orchestrator] Failed to list ad accounts: {e}")
+            raise
     
     async def create_campaign(
         self,

@@ -1,9 +1,17 @@
+================================================================================
+ List of Ad Account
+================================================================================
+
+{
+  "action": "list_ad_accounts"
+}
 
 ================================================================================
  CREATE CAMPAIGN
 ================================================================================
 
 {
+  "ad_account_id": "120244256006770196",
   "action": "create_campaign",
   "campaign": {
     "name": "JSON Action Campaign",
@@ -21,6 +29,7 @@
 ================================================================================
 
 {
+  "ad_account_id": "120244256006770196",
   "action": "create_adset",
   "adset": {
     "name": "JSON Action Ad Set",
@@ -48,6 +57,7 @@
 ================================================================================
 
 {
+  "ad_account_id": "120244256006770196",
   "action": "update_campaign",
   "campaign_id": "120244256006770196",
   "update_type": "pause"
@@ -60,6 +70,7 @@ update_type options: "pause", "active", "delete"
 ================================================================================
 
 {
+  "ad_account_id": "120244256006770196",
   "action": "update_adset",
   "adset_id": "120244255421590196",
   "update_type": "pause"
@@ -72,6 +83,7 @@ update_type options: "pause", "active", "delete"
 ================================================================================
 
 {
+  "ad_account_id": "120244256006770196",
   "action": "get_campaign",
   "campaign_id": "120244256006770196"
 }
@@ -82,6 +94,7 @@ update_type options: "pause", "active", "delete"
 ================================================================================
 
 {
+  "ad_account_id": "120244256006770196",
   "action": "get_adset",
   "adset_id": "120244255421590196"
 }
@@ -91,6 +104,7 @@ Upload image
 ================================================================================
 
 {
+  "ad_account_id": "120244256006770196",
   "action": "upload_image",
   "filepath": "/Users/cheesea/Downloads/sun.jpg",
   "width": 1200,
@@ -102,21 +116,23 @@ Upload video
 ================================================================================
 
 {
+  "ad_account_id": "120244256006770196",
   "action": "upload_video",
   "filepath": "/Users/cheesea/Downloads/test_video.mp4",
   "duration": 15,
   "width": 1080,
   "height": 1920,
-  "upload_phase": "finish"
+  "upload_phase": "start"
 }
 
-upload_phase options : "init" "upload" "finish"
+upload_phase options: "start", "transfer", "finish", "cancel"
 
 ================================================================================
  GET image
 ================================================================================
 
 {
+  "ad_account_id": "120244256006770196",
   "action": "get_image",
   "image_hash": "bdf2031e76bc58b77a175e7a2bba40b7"
 }
@@ -126,6 +142,7 @@ upload_phase options : "init" "upload" "finish"
 ================================================================================
 
 {
+  "ad_account_id": "120244256006770196",
   "action": "get_video",
   "video_id": "1312775083949088"
 }
@@ -135,6 +152,79 @@ upload_phase options : "init" "upload" "finish"
 ================================================================================
 
 {
-  "action": "get_image",
-  "image_hash": "bdf2031e76bc58b77a175e7a2bba40b7"
+  "ad_account_id": "120244256006770196",
+  "action": "clear_asset_cache"
 }
+
+================================================================================
+ Create Creative
+================================================================================
+
+{
+  "ad_account_id": "120244256006770196",
+  "action": "create_creative",
+  "creative": {
+    "name": "Test Creative - Product Ad 01",
+    "object_story_spec": {
+      "page_id": "864501833422699",
+      "link_data": {
+        "message": "Check out our latest product!",
+        "link": "https://example.com/product",
+        "caption": "https://example.com/offer",
+        "description": "Get 20% off today",
+        "picture": "https://www.facebook.com/images/fb_icon_325x325.png"
+      }
+    }
+  }
+}
+
+================================================================================
+ Get Creative
+================================================================================
+
+{
+  "ad_account_id": "120244256006770196",
+  "action": "get_creative",
+  "creative_id": "1534146091157521"
+}
+
+================================================================================
+ Create Ad
+================================================================================
+
+{
+  "ad_account_id": "120244256006770196",
+  "action": "create_ad",
+  "ad": {
+    "name": "Test Ad - Product Promotion",
+    "adset_id": "120244255421590196",
+    "creative": {
+      "creative_id": "1534146091157521"
+    },
+    "status": "PAUSED"
+  }
+}
+
+================================================================================
+ Get ad
+================================================================================
+
+{
+  "ad_account_id": "120244256006770196",
+  "action": "get_ad",
+  "ad_id": "YOUR_AD_ID"
+}
+
+================================================================================
+ Update ad
+================================================================================
+
+{
+  "ad_account_id": "120244256006770196",
+  "action": "update_ad",
+  "ad_id": "YOUR_AD_ID",
+  "update": {
+    "status": "ACTIVE"
+  }
+}
+

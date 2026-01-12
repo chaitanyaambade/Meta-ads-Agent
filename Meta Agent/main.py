@@ -16,6 +16,7 @@ VERBOSE_MODE = "--verbose" in sys.argv
 from dotenv import load_dotenv
 from campaign_adsets_agent import OrchestratorAgent, set_agent_quiet_mode
 from asset_agent import set_asset_quiet_mode
+from ad_agent import set_ad_quiet_mode
 from operations import process_action, set_quiet_mode
 
 # Set quiet mode immediately after imports
@@ -24,10 +25,12 @@ if not VERBOSE_MODE:
     set_quiet_mode(True)
     set_agent_quiet_mode(True)
     set_asset_quiet_mode(True)
+    set_ad_quiet_mode(True)
 else:
     set_quiet_mode(QUIET_MODE)
     set_agent_quiet_mode(QUIET_MODE)
     set_asset_quiet_mode(QUIET_MODE)
+    set_ad_quiet_mode(QUIET_MODE)
 
 
 async def main():
@@ -37,16 +40,15 @@ async def main():
     # Load environment variables
     load_dotenv()
     
-    # Get credentials from environment
+    # Get access token from environment (.env file)
     access_token = os.getenv('META_ACCESS_TOKEN')
-    ad_account_id = os.getenv('META_AD_ACCOUNT_ID')
     
-    if not access_token or not ad_account_id:
+    if not access_token:
         if VERBOSE_MODE:
-            print("\n✗ Error: Missing required environment variables")
-            print("   Please set META_ACCESS_TOKEN and META_AD_ACCOUNT_ID in .env file")
+            print("\n✗ Error: Missing required environment variable")
+            print("   Please set META_ACCESS_TOKEN in .env file")
         else:
-            print(json.dumps({"status": "error", "message": "Missing credentials in .env"}))
+            print(json.dumps({"status": "error", "message": "Missing META_ACCESS_TOKEN in .env"}))
         return
     
     # Parse command line arguments
@@ -89,24 +91,44 @@ async def main():
             print(json.dumps({"status": "error", "message": f"Error reading file: {e}"}))
         return
     
+    # Extract ad_account_id from action payload
+    ad_account_id = action_payload.get('ad_account_id')
+    action = action_payload.get('action', '').lower()
+    
+    # For list_ad_accounts, ad_account_id can be placeholder (not used)
+    if action != 'list_ad_accounts' and not ad_account_id:
+        if VERBOSE_MODE:
+            print(f"\n✗ Error: Missing 'ad_account_id' in action JSON")
+            print(f"   Every action must include 'ad_account_id' field")
+        else:
+            print(json.dumps({"status": "error", "message": "Missing 'ad_account_id' in action JSON"}))
+        return
+    
+    # For list_ad_accounts, use placeholder if not provided
+    if not ad_account_id:
+        ad_account_id = "placeholder"
+    
     # Initialize orchestrator
     if VERBOSE_MODE:
         print("\n[INFO] Initializing Meta Ads Agent...")
     orchestrator = OrchestratorAgent(access_token)
     
     try:
-        # Validate credentials with API
-        is_valid = await orchestrator.validate_credentials(ad_account_id)
-        if not is_valid:
-            if VERBOSE_MODE:
-                print("\n✗ Error: Invalid credentials. Please check your META_ACCESS_TOKEN and META_AD_ACCOUNT_ID")
-            else:
-                print(json.dumps({"status": "error", "message": "Invalid credentials"}))
-            return
+        # Skip credential validation for list_ad_accounts action
+        if action != 'list_ad_accounts':
+            # Validate credentials with API
+            is_valid = await orchestrator.validate_credentials(ad_account_id)
+            if not is_valid:
+                if VERBOSE_MODE:
+                    print("\n✗ Error: Invalid credentials. Please check your META_ACCESS_TOKEN and META_AD_ACCOUNT_ID")
+                else:
+                    print(json.dumps({"status": "error", "message": "Invalid credentials"}))
+                return
         
         if VERBOSE_MODE:
-            print("✓ Credentials validated successfully")
-            print(f"✓ Using ad account: {ad_account_id}\n")
+            print("✓ Credentials validated successfully" if action != 'list_ad_accounts' else "✓ Access token verified")
+            if action != 'list_ad_accounts':
+                print(f"✓ Using ad account: {ad_account_id}\n")
         
             # Process the action
             print(f"[INFO] Processing action from: {action_file}")

@@ -93,6 +93,49 @@ async def handle_update_campaign(orchestrator: OrchestratorAgent, ad_account_id:
         return {"status": "error", "message": str(e)}
 
 
+async def handle_list_ad_accounts(orchestrator: OrchestratorAgent, ad_account_id: str, payload: dict) -> dict:
+    """List all ad accounts accessible with current access token"""
+    log_section("LIST AD ACCOUNTS")
+    
+    try:
+        accounts = await orchestrator.list_ad_accounts()
+        
+        if not accounts:
+            log_info(f"\n✗ No ad accounts found")
+            return {"status": "success", "accounts": [], "count": 0}
+        
+        log_info(f"\n✓ Found {len(accounts)} ad account(s):")
+        account_list = []
+        for idx, account in enumerate(accounts, 1):
+            acc_id = account.get("id")
+            acc_name = account.get("name")
+            acc_status = account.get("account_status")
+            acc_currency = account.get("currency")
+            acc_timezone = account.get("timezone_name")
+            
+            log_info(f"\n  [{idx}] {acc_name}")
+            log_info(f"      ID: {acc_id}")
+            log_info(f"      Status: {acc_status}")
+            log_info(f"      Currency: {acc_currency}")
+            log_info(f"      Timezone: {acc_timezone}")
+            log_info(f"      Created: {account.get('created_time')}")
+            
+            account_list.append({
+                "id": acc_id,
+                "name": acc_name,
+                "status": acc_status,
+                "currency": acc_currency,
+                "timezone": acc_timezone,
+                "created_time": account.get("created_time")
+            })
+        
+        return {"status": "success", "accounts": account_list, "count": len(accounts)}
+    
+    except Exception as e:
+        log_info(f"\n✗ Error: {e}")
+        return {"status": "error", "message": str(e)}
+
+
 async def handle_get_campaign(orchestrator: OrchestratorAgent, ad_account_id: str, payload: dict) -> dict:
     """Get campaign details"""
     log_section("GET CAMPAIGN")
@@ -251,6 +294,92 @@ async def handle_list_campaigns(orchestrator: OrchestratorAgent, ad_account_id: 
         
         return {"status": "success", "campaigns": campaign_list, "count": len(campaigns)}
     
+    except Exception as e:
+        log_info(f"\n✗ Error: {e}")
+        return {"status": "error", "message": str(e)}
+
+
+async def handle_create_creative(orchestrator: OrchestratorAgent, ad_account_id: str, payload: dict) -> dict:
+    """Create an ad creative"""
+    log_section("CREATE CREATIVE")
+    try:
+        creative = payload.get("creative")
+        if not creative:
+            raise ValidationError("Missing 'creative' object in payload")
+
+        result = await orchestrator.ad_agent.create_creative(ad_account_id, creative)
+
+        log_info(f"\n✓ Creative created: {result.id}")
+        return {"status": "success", "creative_id": result.id, "data": result.data}
+    except Exception as e:
+        log_info(f"\n✗ Error: {e}")
+        return {"status": "error", "message": str(e)}
+
+
+async def handle_get_creative(orchestrator: OrchestratorAgent, ad_account_id: str, payload: dict) -> dict:
+    """Get creative details"""
+    log_section("GET CREATIVE")
+    try:
+        creative_id = payload.get("creative_id")
+        if not creative_id:
+            raise ValidationError("Missing 'creative_id' in payload")
+
+        result = await orchestrator.ad_agent.get_creative(creative_id)
+        log_info(f"\n✓ Creative retrieved: {creative_id}")
+        return {"status": "success", "creative_id": creative_id, "data": result}
+    except Exception as e:
+        log_info(f"\n✗ Error: {e}")
+        return {"status": "error", "message": str(e)}
+
+
+async def handle_create_ad(orchestrator: OrchestratorAgent, ad_account_id: str, payload: dict) -> dict:
+    """Create an ad"""
+    log_section("CREATE AD")
+    try:
+        ad = payload.get("ad")
+        if not ad:
+            raise ValidationError("Missing 'ad' object in payload")
+
+        result = await orchestrator.ad_agent.create_ad(ad_account_id, ad)
+
+        log_info(f"\n✓ Ad created: {result.id}")
+        return {"status": "success", "ad_id": result.id, "data": result.data}
+    except Exception as e:
+        log_info(f"\n✗ Error: {e}")
+        return {"status": "error", "message": str(e)}
+
+
+async def handle_update_ad(orchestrator: OrchestratorAgent, ad_account_id: str, payload: dict) -> dict:
+    """Update an ad"""
+    log_section("UPDATE AD")
+    try:
+        ad_id = payload.get("ad_id")
+        update_fields = payload.get("update")
+        if not ad_id:
+            raise ValidationError("Missing 'ad_id' in payload")
+        if not update_fields:
+            raise ValidationError("Missing 'update' object in payload")
+
+        result = await orchestrator.ad_agent.update_ad(ad_id, update_fields)
+
+        log_info(f"\n✓ Ad updated: {ad_id}")
+        return {"status": "success", "ad_id": ad_id, "data": result}
+    except Exception as e:
+        log_info(f"\n✗ Error: {e}")
+        return {"status": "error", "message": str(e)}
+
+
+async def handle_get_ad(orchestrator: OrchestratorAgent, ad_account_id: str, payload: dict) -> dict:
+    """Get ad details"""
+    log_section("GET AD")
+    try:
+        ad_id = payload.get("ad_id")
+        if not ad_id:
+            raise ValidationError("Missing 'ad_id' in payload")
+
+        result = await orchestrator.ad_agent.get_ad(ad_id)
+        log_info(f"\n✓ Ad retrieved: {ad_id}")
+        return {"status": "success", "ad_id": ad_id, "data": result}
     except Exception as e:
         log_info(f"\n✗ Error: {e}")
         return {"status": "error", "message": str(e)}
@@ -429,7 +558,9 @@ async def process_action(orchestrator: OrchestratorAgent, ad_account_id: str, ac
     """Main action dispatcher - routes to appropriate handler"""
     action = action_payload.get("action", "").lower()
     
-    if action == "create_campaign":
+    if action == "list_ad_accounts":
+        return await handle_list_ad_accounts(orchestrator, ad_account_id, action_payload)
+    elif action == "create_campaign":
         return await handle_create_campaign(orchestrator, ad_account_id, action_payload)
     elif action == "update_campaign":
         return await handle_update_campaign(orchestrator, ad_account_id, action_payload)
@@ -453,11 +584,23 @@ async def process_action(orchestrator: OrchestratorAgent, ad_account_id: str, ac
         return await handle_get_video(orchestrator, ad_account_id, action_payload)
     elif action == "clear_asset_cache":
         return await handle_clear_asset_cache(orchestrator, ad_account_id, action_payload)
+    elif action == "create_creative":
+        return await handle_create_creative(orchestrator, ad_account_id, action_payload)
+    elif action == "get_creative":
+        return await handle_get_creative(orchestrator, ad_account_id, action_payload)
+    elif action == "create_ad":
+        return await handle_create_ad(orchestrator, ad_account_id, action_payload)
+    elif action == "update_ad":
+        return await handle_update_ad(orchestrator, ad_account_id, action_payload)
+    elif action == "get_ad":
+        return await handle_get_ad(orchestrator, ad_account_id, action_payload)
     else:
         supported_actions = [
+            "list_ad_accounts",
             "create_campaign", "update_campaign", "get_campaign", "list_campaigns",
             "create_adset", "update_adset", "get_adset",
-            "upload_image", "upload_video", "get_image", "get_video", "clear_asset_cache"
+            "upload_image", "upload_video", "get_image", "get_video", "clear_asset_cache",
+            "create_creative", "get_creative", "create_ad", "update_ad", "get_ad"
         ]
         error_msg = f"Unknown action: {action}. Supported: {', '.join(supported_actions)}"
         log_info(f"\n✗ {error_msg}")
