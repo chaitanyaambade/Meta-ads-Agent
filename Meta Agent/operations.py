@@ -5,8 +5,10 @@ Handles all operations via JSON action parameter
 
 import json
 import os
+import asyncio
 from campaign_adsets_agent import OrchestratorAgent, CampaignParams, create_adset_params_from_json, ValidationError
 from asset_agent import AssetValidationError, AssetUploadError
+from insights_agent import InsightsAgent, validate_date_preset, validate_breakdown
 
 # Global quiet flag for JSON-only output
 QUIET_MODE = False
@@ -554,6 +556,329 @@ async def handle_clear_asset_cache(orchestrator: OrchestratorAgent, ad_account_i
         return {"status": "error", "message": str(e)}
 
 
+# ============================================================================
+# INSIGHTS OPERATIONS
+# ============================================================================
+
+async def handle_get_account_insights(orchestrator: OrchestratorAgent, ad_account_id: str, payload: dict) -> dict:
+    """Get account level insights"""
+    log_section("GET ACCOUNT INSIGHTS")
+    
+    try:
+        insights_agent = InsightsAgent(orchestrator.access_token)
+        
+        date_preset = payload.get("date_preset", "last_7d")
+        fields = payload.get("fields")
+        
+        # Validate date preset
+        if not validate_date_preset(date_preset):
+            raise ValidationError(f"Invalid date_preset: {date_preset}")
+        
+        log_info(f"\n[INFO] Account ID: {ad_account_id}")
+        log_info(f"[INFO] Date preset: {date_preset}")
+        
+        response = await insights_agent.get_account_insights(ad_account_id, date_preset, fields)
+        
+        log_info(f"\n✓ Account insights retrieved successfully")
+        
+        return {
+            "status": "success",
+            "insights_type": "account",
+            "account_id": ad_account_id,
+            "data": response
+        }
+    
+    except Exception as e:
+        log_info(f"\n✗ Error: {e}")
+        return {"status": "error", "message": str(e)}
+
+
+async def handle_get_campaign_insights(orchestrator: OrchestratorAgent, ad_account_id: str, payload: dict) -> dict:
+    """Get campaign level insights"""
+    log_section("GET CAMPAIGN INSIGHTS")
+    
+    try:
+        insights_agent = InsightsAgent(orchestrator.access_token)
+        
+        campaign_id = payload.get("campaign_id")
+        if not campaign_id:
+            raise ValidationError("Missing 'campaign_id' in payload")
+        
+        date_preset = payload.get("date_preset", "last_7d")
+        fields = payload.get("fields")
+        breakdowns = payload.get("breakdowns")
+        
+        # Validate date preset
+        if not validate_date_preset(date_preset):
+            raise ValidationError(f"Invalid date_preset: {date_preset}")
+        
+        # Validate breakdowns if provided
+        if breakdowns:
+            for breakdown in breakdowns:
+                if not validate_breakdown(breakdown):
+                    log_info(f"\n[WARNING] Unknown breakdown: {breakdown} (will attempt anyway)")
+        
+        log_info(f"\n[INFO] Campaign ID: {campaign_id}")
+        log_info(f"[INFO] Date preset: {date_preset}")
+        if breakdowns:
+            log_info(f"[INFO] Breakdowns: {', '.join(breakdowns)}")
+        
+        response = await insights_agent.get_campaign_insights(campaign_id, date_preset, fields, breakdowns)
+        
+        log_info(f"\n✓ Campaign insights retrieved successfully")
+        
+        return {
+            "status": "success",
+            "insights_type": "campaign",
+            "campaign_id": campaign_id,
+            "data": response
+        }
+    
+    except Exception as e:
+        log_info(f"\n✗ Error: {e}")
+        return {"status": "error", "message": str(e)}
+
+
+async def handle_get_adset_insights(orchestrator: OrchestratorAgent, ad_account_id: str, payload: dict) -> dict:
+    """Get ad set level insights"""
+    log_section("GET AD SET INSIGHTS")
+    
+    try:
+        insights_agent = InsightsAgent(orchestrator.access_token)
+        
+        adset_id = payload.get("adset_id")
+        if not adset_id:
+            raise ValidationError("Missing 'adset_id' in payload")
+        
+        date_preset = payload.get("date_preset", "last_7d")
+        fields = payload.get("fields")
+        breakdowns = payload.get("breakdowns")
+        
+        # Validate date preset
+        if not validate_date_preset(date_preset):
+            raise ValidationError(f"Invalid date_preset: {date_preset}")
+        
+        # Validate breakdowns if provided
+        if breakdowns:
+            for breakdown in breakdowns:
+                if not validate_breakdown(breakdown):
+                    log_info(f"\n[WARNING] Unknown breakdown: {breakdown} (will attempt anyway)")
+        
+        log_info(f"\n[INFO] Ad Set ID: {adset_id}")
+        log_info(f"[INFO] Date preset: {date_preset}")
+        if breakdowns:
+            log_info(f"[INFO] Breakdowns: {', '.join(breakdowns)}")
+        
+        response = await insights_agent.get_adset_insights(adset_id, date_preset, fields, breakdowns)
+        
+        log_info(f"\n✓ Ad set insights retrieved successfully")
+        
+        return {
+            "status": "success",
+            "insights_type": "adset",
+            "adset_id": adset_id,
+            "data": response
+        }
+    
+    except Exception as e:
+        log_info(f"\n✗ Error: {e}")
+        return {"status": "error", "message": str(e)}
+
+
+async def handle_get_ad_insights(orchestrator: OrchestratorAgent, ad_account_id: str, payload: dict) -> dict:
+    """Get ad level insights"""
+    log_section("GET AD INSIGHTS")
+    
+    try:
+        insights_agent = InsightsAgent(orchestrator.access_token)
+        
+        ad_id = payload.get("ad_id")
+        if not ad_id:
+            raise ValidationError("Missing 'ad_id' in payload")
+        
+        date_preset = payload.get("date_preset", "last_7d")
+        fields = payload.get("fields")
+        breakdowns = payload.get("breakdowns")
+        
+        # Validate date preset
+        if not validate_date_preset(date_preset):
+            raise ValidationError(f"Invalid date_preset: {date_preset}")
+        
+        # Validate breakdowns if provided
+        if breakdowns:
+            for breakdown in breakdowns:
+                if not validate_breakdown(breakdown):
+                    log_info(f"\n[WARNING] Unknown breakdown: {breakdown} (will attempt anyway)")
+        
+        log_info(f"\n[INFO] Ad ID: {ad_id}")
+        log_info(f"[INFO] Date preset: {date_preset}")
+        if breakdowns:
+            log_info(f"[INFO] Breakdowns: {', '.join(breakdowns)}")
+        
+        response = await insights_agent.get_ad_insights(ad_id, date_preset, fields, breakdowns)
+        
+        log_info(f"\n✓ Ad insights retrieved successfully")
+        
+        return {
+            "status": "success",
+            "insights_type": "ad",
+            "ad_id": ad_id,
+            "data": response
+        }
+    
+    except Exception as e:
+        log_info(f"\n✗ Error: {e}")
+        return {"status": "error", "message": str(e)}
+
+
+async def handle_get_performance_report(orchestrator: OrchestratorAgent, ad_account_id: str, payload: dict) -> dict:
+    """Generate performance report from insights"""
+    log_section("GET PERFORMANCE REPORT")
+    
+    try:
+        insights_agent = InsightsAgent(orchestrator.access_token)
+        
+        report_type = payload.get("report_type", "campaign").lower()  # campaign, adset, or ad
+        date_preset = payload.get("date_preset", "last_7d")
+        breakdowns = payload.get("breakdowns")
+        
+        if report_type not in ["campaign", "adset", "ad"]:
+            raise ValidationError(f"Invalid report_type: {report_type}. Must be 'campaign', 'adset', or 'ad'")
+        
+        log_info(f"\n[INFO] Report type: {report_type}")
+        log_info(f"[INFO] Date preset: {date_preset}")
+        
+        insights_data = None
+        
+        if report_type == "campaign":
+            # Get all campaigns for the account and get their insights
+            log_info(f"\n[INFO] Fetching campaigns insights...")
+            campaigns = await orchestrator.list_campaigns(ad_account_id)
+            insights_data = []
+            for campaign in campaigns:
+                try:
+                    response = await insights_agent.get_campaign_insights(
+                        campaign.get("id"), date_preset, breakdowns=breakdowns
+                    )
+                    if "data" in response:
+                        insights_data.extend(response["data"])
+                except:
+                    pass
+        
+        elif report_type == "adset":
+            # Get all ad sets and their insights
+            log_info(f"\n[INFO] Fetching ad sets insights...")
+            adsets = await orchestrator.list_adsets(ad_account_id)
+            insights_data = []
+            for adset in adsets:
+                try:
+                    response = await insights_agent.get_adset_insights(
+                        adset.get("id"), date_preset, breakdowns=breakdowns
+                    )
+                    if "data" in response:
+                        insights_data.extend(response["data"])
+                except:
+                    pass
+        
+        elif report_type == "ad":
+            # Get all ads and their insights
+            log_info(f"\n[INFO] Fetching ads insights...")
+            ads = await orchestrator.list_ads(ad_account_id)
+            insights_data = []
+            for ad in ads:
+                try:
+                    response = await insights_agent.get_ad_insights(
+                        ad.get("id"), date_preset, breakdowns=breakdowns
+                    )
+                    if "data" in response:
+                        insights_data.extend(response["data"])
+                except:
+                    pass
+        
+        # Generate report
+        report = insights_agent.generate_performance_report(insights_data, report_type.capitalize())
+        
+        log_info(f"\n✓ Performance report generated successfully")
+        log_info(f"✓ Total records analyzed: {len(insights_data)}")
+        
+        return {
+            "status": "success",
+            "report_type": report_type,
+            "report": report
+        }
+    
+    except Exception as e:
+        log_info(f"\n✗ Error: {e}")
+        return {"status": "error", "message": str(e)}
+
+
+async def handle_export_insights(orchestrator: OrchestratorAgent, ad_account_id: str, payload: dict) -> dict:
+    """Export insights to file"""
+    log_section("EXPORT INSIGHTS")
+    
+    try:
+        insights_agent = InsightsAgent(orchestrator.access_token)
+        
+        export_format = payload.get("format", "json").lower()  # json or csv
+        insights_type = payload.get("insights_type", "campaign").lower()
+        date_preset = payload.get("date_preset", "last_7d")
+        filename = payload.get("filename", f"insights_{insights_type}_{date_preset}.{export_format}")
+        
+        if export_format not in ["json", "csv"]:
+            raise ValidationError(f"Invalid format: {export_format}. Must be 'json' or 'csv'")
+        
+        log_info(f"\n[INFO] Export format: {export_format}")
+        log_info(f"\n[INFO] Insights type: {insights_type}")
+        log_info(f"\n[INFO] Output file: {filename}")
+        
+        # Collect insights data based on type
+        if insights_type == "campaign":
+            campaigns = await orchestrator.list_campaigns(ad_account_id)
+            insights_data = []
+            for campaign in campaigns:
+                response = await insights_agent.get_campaign_insights(campaign.get("id"), date_preset)
+                if "data" in response:
+                    insights_data.extend(response["data"])
+        
+        elif insights_type == "adset":
+            adsets = await orchestrator.list_adsets(ad_account_id)
+            insights_data = []
+            for adset in adsets:
+                response = await insights_agent.get_adset_insights(adset.get("id"), date_preset)
+                if "data" in response:
+                    insights_data.extend(response["data"])
+        
+        elif insights_type == "ad":
+            ads = await orchestrator.list_ads(ad_account_id)
+            insights_data = []
+            for ad in ads:
+                response = await insights_agent.get_ad_insights(ad.get("id"), date_preset)
+                if "data" in response:
+                    insights_data.extend(response["data"])
+        
+        else:
+            raise ValidationError(f"Invalid insights_type: {insights_type}")
+        
+        # Export data
+        if export_format == "json":
+            export_path = insights_agent.export_to_json({"insights": insights_data}, filename)
+        else:  # csv
+            export_path = insights_agent.export_to_csv(insights_data, filename)
+        
+        log_info(f"\n✓ Insights exported successfully")
+        
+        return {
+            "status": "success",
+            "export_format": export_format,
+            "filepath": export_path,
+            "records_count": len(insights_data)
+        }
+    
+    except Exception as e:
+        log_info(f"\n✗ Error: {e}")
+        return {"status": "error", "message": str(e)}
+
+
 async def process_action(orchestrator: OrchestratorAgent, ad_account_id: str, action_payload: dict) -> dict:
     """Main action dispatcher - routes to appropriate handler"""
     action = action_payload.get("action", "").lower()
@@ -594,13 +919,27 @@ async def process_action(orchestrator: OrchestratorAgent, ad_account_id: str, ac
         return await handle_update_ad(orchestrator, ad_account_id, action_payload)
     elif action == "get_ad":
         return await handle_get_ad(orchestrator, ad_account_id, action_payload)
+    elif action == "get_account_insights":
+        return await handle_get_account_insights(orchestrator, ad_account_id, action_payload)
+    elif action == "get_campaign_insights":
+        return await handle_get_campaign_insights(orchestrator, ad_account_id, action_payload)
+    elif action == "get_adset_insights":
+        return await handle_get_adset_insights(orchestrator, ad_account_id, action_payload)
+    elif action == "get_ad_insights":
+        return await handle_get_ad_insights(orchestrator, ad_account_id, action_payload)
+    elif action == "get_performance_report":
+        return await handle_get_performance_report(orchestrator, ad_account_id, action_payload)
+    elif action == "export_insights":
+        return await handle_export_insights(orchestrator, ad_account_id, action_payload)
     else:
         supported_actions = [
             "list_ad_accounts",
             "create_campaign", "update_campaign", "get_campaign", "list_campaigns",
             "create_adset", "update_adset", "get_adset",
             "upload_image", "upload_video", "get_image", "get_video", "clear_asset_cache",
-            "create_creative", "get_creative", "create_ad", "update_ad", "get_ad"
+            "create_creative", "get_creative", "create_ad", "update_ad", "get_ad",
+            "get_account_insights", "get_campaign_insights", "get_adset_insights", 
+            "get_ad_insights", "get_performance_report", "export_insights"
         ]
         error_msg = f"Unknown action: {action}. Supported: {', '.join(supported_actions)}"
         log_info(f"\n✗ {error_msg}")
