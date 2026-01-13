@@ -14,26 +14,17 @@ VERBOSE_MODE = "--verbose" in sys.argv
 
 # Now import modules
 from dotenv import load_dotenv
-from campaign_adsets_agent import OrchestratorAgent, set_agent_quiet_mode
-from asset_agent import set_asset_quiet_mode
-from ad_agent import set_ad_quiet_mode
-from insights_agent import set_insights_quiet_mode
-from operations import process_action, set_quiet_mode
+from src.agents.orchestrator import OrchestratorAgent
+from src.core.utils import set_quiet_mode
+from src.handlers.operations import process_action, set_operations_quiet_mode
 
 # Set quiet mode immediately after imports
-# If not verbose and not json, use semi-quiet (no debug, only result)
 if not VERBOSE_MODE:
     set_quiet_mode(True)
-    set_agent_quiet_mode(True)
-    set_asset_quiet_mode(True)
-    set_ad_quiet_mode(True)
-    set_insights_quiet_mode(True)
+    set_operations_quiet_mode(True)
 else:
     set_quiet_mode(QUIET_MODE)
-    set_agent_quiet_mode(QUIET_MODE)
-    set_asset_quiet_mode(QUIET_MODE)
-    set_ad_quiet_mode(QUIET_MODE)
-    set_insights_quiet_mode(QUIET_MODE)
+    set_operations_quiet_mode(QUIET_MODE)
 
 
 async def main():

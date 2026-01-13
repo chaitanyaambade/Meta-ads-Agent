@@ -16,16 +16,43 @@ Meta Ads Agent provides a modular, asynchronous architecture for managing:
 
 ## 📁 Project Structure
 
-### Core Modules (5 files)
-
-| File | Purpose |
-|------|---------|
-| **main.py** | CLI entry point; handles JSON actions and output modes |
-| **campaign_adsets_agent.py** | Campaign & ad set management; includes API client & orchestrator |
-| **asset_agent.py** | Image/video upload, validation, and local caching |
-| **ad_agent.py** | Ad creative and ad creation/management |
-| **insights_agent.py** | Performance data fetching, analysis, and reporting |
-| **operations.py** | JSON action handlers and dispatcher |
+```
+Meta Agent/
+├── main.py                      # CLI entry point
+├── input.json                   # Action input file
+├── requirements.txt             # Python dependencies
+├── .env                         # Environment variables (access token)
+├── .gitignore                   # Git ignore config
+├── .asset_cache.json            # Uploaded assets cache
+├── README.md                    # Documentation
+│
+├── src/                         # Source code
+│   ├── __init__.py
+│   │
+│   ├── core/                    # Core modules
+│   │   ├── __init__.py
+│   │   ├── config.py            # Configuration settings
+│   │   ├── exceptions.py        # Custom exceptions
+│   │   ├── models.py            # Data models & classes
+│   │   ├── api_client.py        # Meta API HTTP client
+│   │   └── utils.py             # Utility functions
+│   │
+│   ├── agents/                  # Agent modules
+│   │   ├── __init__.py
+│   │   ├── orchestrator.py      # Main coordinator agent
+│   │   ├── campaign_agent.py    # Campaign & ad set management
+│   │   ├── asset_agent.py       # Image/video upload & caching
+│   │   ├── ad_agent.py          # Ad creative & ad management
+│   │   └── insights_agent.py    # Performance data & analytics
+│   │
+│   └── handlers/                # Action handlers
+│       ├── __init__.py
+│       └── operations.py        # JSON action dispatcher
+│
+└── examples/                    # Example files
+    ├── input_example.txt        # All action examples
+    └── sample_input.json        # Sample input file
+```
 
 ### Agents Architecture
 
@@ -36,7 +63,7 @@ OrchestratorAgent (Main Coordinator)
 ├── AdCreationAgent      → Ad creative & ad management
 └── InsightsAgent        → Performance data & analytics
 
-MetaAPIClient (Async HTTP wrapper)
+MetaAPIClient (Async HTTP wrapper for Meta Graph API)
 ```
 
 ---
@@ -76,23 +103,28 @@ python3 main.py --verbose create_campaign.json
 
 ---
 
-## 📋 Supported Operations (24 Total)
+## 📋 Supported Operations (26 Total)
 
 ### Account Operations (1)
 | Action | Purpose | Returns |
 |--------|---------|---------|
 | `list_ad_accounts` | List all ad accounts | Array of ad account objects |
 
-### Campaign Operations (7)
+### Campaign Operations (5)
 | Action | Purpose |
 |--------|---------|
 | `create_campaign` | Create new advertising campaign |
 | `update_campaign` | Update campaign status (pause/active/delete) |
 | `get_campaign` | Get campaign details |
 | `list_campaigns` | List all campaigns in account |
+
+### Ad Set Operations (4)
+| Action | Purpose |
+|--------|---------|
 | `create_adset` | Create ad set with targeting |
 | `update_adset` | Update ad set status |
 | `get_adset` | Get ad set details |
+| `list_adsets` | List all ad sets in account or under a campaign |
 
 ### Asset Operations (5)
 | Action | Purpose | Returns |
@@ -103,7 +135,7 @@ python3 main.py --verbose create_campaign.json
 | `get_video` | Retrieve video by ID | Video metadata |
 | `clear_asset_cache` | Clear local asset cache | Success message |
 
-### Ad Operations (5)
+### Ad Operations (6)
 | Action | Purpose | Required Fields |
 |--------|---------|-----------------|
 | `create_creative` | Create ad creative | name, object_story_spec OR asset_feed_spec |
@@ -111,6 +143,7 @@ python3 main.py --verbose create_campaign.json
 | `create_ad` | Create ad | name, adset_id, creative |
 | `update_ad` | Update ad fields | ad_id, update object |
 | `get_ad` | Get ad details | ad_id |
+| `list_ads` | List all ads in account or ad set | (optional: adset_id) |
 
 ### Insights Operations (6)
 | Action | Purpose | Required Fields |
@@ -160,6 +193,71 @@ Get all ad accounts available under your access token:
 }
 ```
 **Note:** `ad_account_id` not required for this action.
+
+### List Campaigns
+Get all campaigns in an ad account:
+```json
+{
+  "ad_account_id": "120244256006770196",
+  "action": "list_campaigns"
+}
+```
+
+### List Ad Sets
+List all ad sets in an ad account:
+```json
+{
+  "ad_account_id": "120244256006770196",
+  "action": "list_adsets"
+}
+```
+
+List ad sets under a specific campaign:
+```json
+{
+  "ad_account_id": "120244256006770196",
+  "action": "list_adsets",
+  "campaign_id": "120244256006770196"
+}
+```
+
+With optional limit parameter:
+```json
+{
+  "ad_account_id": "120244256006770196",
+  "action": "list_adsets",
+  "campaign_id": "120244256006770196",
+  "limit": 100
+}
+```
+
+### List Ads
+List all ads in an ad account:
+```json
+{
+  "ad_account_id": "120244256006770196",
+  "action": "list_ads"
+}
+```
+
+List ads under a specific ad set:
+```json
+{
+  "ad_account_id": "120244256006770196",
+  "action": "list_ads",
+  "adset_id": "120244255421590196"
+}
+```
+
+With optional limit parameter:
+```json
+{
+  "ad_account_id": "120244256006770196",
+  "action": "list_ads",
+  "adset_id": "120244255421590196",
+  "limit": 100
+}
+```
 
 ### Create Campaign
 ```json
@@ -501,36 +599,17 @@ python3 main.py clear_asset_cache.json
 
 ---
 
-## 🗂️ File Structure
-
-```
-/Meta Agent
-├── main.py                      # CLI entry point
-├── campaign_adsets_agent.py     # Campaign & ad set management
-├── asset_agent.py               # Image/video upload & caching
-├── ad_agent.py                  # Ad creative & ad management
-├── insights_agent.py            # Performance insights & analytics
-├── operations.py                # Action handlers & dispatcher
-├── .env                         # Your credentials
-├── .asset_cache.json            # Uploaded assets cache
-├── .gitignore                   # Git ignore config
-├── README.md                    # This file
-├── input_exapmle.txt            # Example : For all operations
-└── input.json                   # Input in this file
-```
-
----
-
 ## ✅ Features & Status
 
 ### ✅ Fully Implemented
 - Campaign CRUD operations
-- Ad Set creation & management
+- Ad Set creation, management & listing
+- Ad creation, updates & listing
 - Image upload with validation & caching
 - Video upload with validation & caching
 - Asset retrieval by hash/ID
 - Ad creative creation (flexible fields)
-- Ad creation & updates
+- **List operations** (ad accounts, campaigns, ad sets, ads)
 - **Performance insights** (account, campaign, ad set, ad levels)
 - **Performance reporting** (comprehensive analytics)
 - **Insights export** (JSON and CSV formats)

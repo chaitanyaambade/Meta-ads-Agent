@@ -1,48 +1,12 @@
 """
 Ad Creation Agent
 Responsible for creating and managing ad creatives and ads.
-
-Endpoints used:
-- Create Creative: POST /act_{ad_account_id}/adcreatives
-- Get Creative: GET /{creative_id}
-- Create Ad: POST /act_{ad_account_id}/ads
-- Update Ad: POST /{ad_id}
-- Get Ad: GET /{ad_id}
-
-This module expects to receive an `api_client` object with async `get` and `post`
-methods that accept (endpoint, params) and (endpoint, json_data) respectively.
-Typically this will be the `MetaAPIClient` instance from `campaign_adsets_agent`.
 """
 
-from dataclasses import dataclass
 from typing import Dict, Any
 
-
-class AdAgentError(Exception):
-    """Base exception for ad agent"""
-    pass
-
-
-class CreativeError(AdAgentError):
-    pass
-
-
-class AdCreationError(AdAgentError):
-    pass
-
-
-@dataclass
-class Creative:
-    id: str
-    name: str
-    data: Dict[str, Any]
-
-
-@dataclass
-class Ad:
-    id: str
-    name: str
-    data: Dict[str, Any]
+from ..core.models import Creative, Ad
+from ..core.exceptions import CreativeError, AdCreationError
 
 
 class AdCreationAgent:
@@ -112,8 +76,28 @@ class AdCreationAgent:
         except Exception as e:
             raise AdCreationError(str(e)) from e
 
+    async def list_ads(self, ad_account_id: str, adset_id: str = None, limit: int = 50) -> list:
+        """List ads under an ad account or specific ad set
 
-def set_ad_quiet_mode(quiet: bool):
-    """Placeholder for symmetry with other agents; kept for API compatibility"""
-    # This module intentionally keeps quiet handling in the orchestrator
-    return
+        Args:
+            ad_account_id: Ad account ID (without act_ prefix)
+            adset_id: Optional ad set ID to filter ads
+            limit: Maximum number of ads to return
+
+        Returns:
+            List of ad dictionaries
+        """
+        if adset_id:
+            endpoint = f"/{adset_id}/ads"
+        else:
+            endpoint = f"/act_{ad_account_id}/ads"
+
+        params = {
+            "fields": "id,name,adset_id,status,effective_status,creative,created_time",
+            "limit": limit
+        }
+        try:
+            response = await self.api.get(endpoint, params=params)
+            return response.get("data", [])
+        except Exception as e:
+            raise AdCreationError(str(e)) from e

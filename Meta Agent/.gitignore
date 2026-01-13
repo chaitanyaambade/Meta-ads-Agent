@@ -1,5 +1,33 @@
+# Environment
 .env
+
+# Python
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+
+# Virtual environment
+.venv/
+venv/
+ENV/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
 .DS_Store
+Thumbs.db
+
+# Project-specific
 .asset_cache.json
+*.log
+
+# Exports
+*.csv
+exports/
