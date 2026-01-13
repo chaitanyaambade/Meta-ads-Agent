@@ -10,6 +10,7 @@ Meta Ads Agent provides a modular, asynchronous architecture for managing:
 - **Assets** — Upload, validate, and cache images and videos
 - **Creatives** — Create ad creatives with flexible specifications
 - **Ads** — Create, update, and manage ads linked to creatives
+- **Insights** — Fetch, analyze, and export performance data
 
 ---
 
@@ -23,6 +24,7 @@ Meta Ads Agent provides a modular, asynchronous architecture for managing:
 | **campaign_adsets_agent.py** | Campaign & ad set management; includes API client & orchestrator |
 | **asset_agent.py** | Image/video upload, validation, and local caching |
 | **ad_agent.py** | Ad creative and ad creation/management |
+| **insights_agent.py** | Performance data fetching, analysis, and reporting |
 | **operations.py** | JSON action handlers and dispatcher |
 
 ### Agents Architecture
@@ -31,7 +33,8 @@ Meta Ads Agent provides a modular, asynchronous architecture for managing:
 OrchestratorAgent (Main Coordinator)
 ├── CampaignAgent        → Campaign & ad set CRUD
 ├── AssetAgent           → Image & video upload/retrieval/cache
-└── AdCreationAgent      → Ad creative & ad management
+├── AdCreationAgent      → Ad creative & ad management
+└── InsightsAgent        → Performance data & analytics
 
 MetaAPIClient (Async HTTP wrapper)
 ```
@@ -73,7 +76,7 @@ python3 main.py --verbose create_campaign.json
 
 ---
 
-## 📋 Supported Operations (18 Total)
+## 📋 Supported Operations (24 Total)
 
 ### Account Operations (1)
 | Action | Purpose | Returns |
@@ -108,6 +111,16 @@ python3 main.py --verbose create_campaign.json
 | `create_ad` | Create ad | name, adset_id, creative |
 | `update_ad` | Update ad fields | ad_id, update object |
 | `get_ad` | Get ad details | ad_id |
+
+### Insights Operations (6)
+| Action | Purpose | Required Fields |
+|--------|---------|-----------------|
+| `get_account_insights` | Fetch account-level performance metrics | date_preset |
+| `get_campaign_insights` | Fetch campaign-level performance metrics | campaign_id, date_preset |
+| `get_adset_insights` | Fetch ad set-level performance metrics | adset_id, date_preset |
+| `get_ad_insights` | Fetch ad-level performance metrics | ad_id, date_preset |
+| `get_performance_report` | Generate comprehensive performance report | report_type, date_preset |
+| `export_insights` | Export insights to JSON or CSV | insights_type, format, date_preset |
 
 ---
 
@@ -283,6 +296,105 @@ Get all ad accounts available under your access token:
 
 ---
 
+## 📊 Insights Operations
+
+### Get Account Insights
+Retrieve account-level performance metrics:
+```json
+{
+  "ad_account_id": "120244256006770196",
+  "action": "get_account_insights",
+  "date_preset": "last_7d",
+  "fields": ["impressions", "clicks", "spend", "reach", "ctr", "cpc", "cpm"]
+}
+```
+
+### Get Campaign Insights
+Retrieve campaign-level performance metrics with optional breakdowns:
+```json
+{
+  "ad_account_id": "120244256006770196",
+  "action": "get_campaign_insights",
+  "campaign_id": "120244256006770196",
+  "date_preset": "last_30d",
+  "breakdowns": ["age", "gender", "country"],
+  "fields": ["impressions", "clicks", "spend", "reach", "actions", "ctr"]
+}
+```
+
+### Get Ad Set Insights
+Retrieve ad set-level performance metrics:
+```json
+{
+  "ad_account_id": "120244256006770196",
+  "action": "get_adset_insights",
+  "adset_id": "120244255421590196",
+  "date_preset": "last_14d",
+  "breakdowns": ["device", "placement"]
+}
+```
+
+### Get Ad Insights
+Retrieve ad-level performance metrics:
+```json
+{
+  "ad_account_id": "120244256006770196",
+  "action": "get_ad_insights",
+  "ad_id": "YOUR_AD_ID",
+  "date_preset": "last_7d"
+}
+```
+
+### Get Performance Report
+Generate comprehensive performance report:
+```json
+{
+  "ad_account_id": "120244256006770196",
+  "action": "get_performance_report",
+  "report_type": "campaign",
+  "date_preset": "last_30d"
+}
+```
+**report_type options:** `"campaign"`, `"adset"`, `"ad"`
+
+### Export Insights
+Export performance data to JSON or CSV:
+```json
+{
+  "ad_account_id": "120244256006770196",
+  "action": "export_insights",
+  "insights_type": "campaign",
+  "format": "csv",
+  "date_preset": "last_30d",
+  "filename": "campaign_insights_march.csv"
+}
+```
+**format options:** `"json"`, `"csv"`
+**insights_type options:** `"campaign"`, `"adset"`, `"ad"`
+
+### Available Date Presets
+- `last_7d` - Last 7 days
+- `last_14d` - Last 14 days
+- `last_28d` - Last 28 days
+- `last_30d` - Last 30 days
+- `last_90d` - Last 90 days
+- `today` - Today
+- `yesterday` - Yesterday
+- `this_week` - This week
+- `last_week` - Last week
+- `last_month` - Last month
+- `this_quarter` - This quarter
+- `last_3m` - Last 3 months
+- `lifetime` - All time
+
+### Available Breakdowns
+- `age`, `gender`, `country`, `region`, `city`
+- `device`, `placement`, `platform`
+- `audience_id`, `conversion_device`, `conversion_destination`
+- `frequency_value`, `impression_device`
+
+---
+
 ## 📊 Asset Specifications
 
 ### Images
@@ -397,6 +509,7 @@ python3 main.py clear_asset_cache.json
 ├── campaign_adsets_agent.py     # Campaign & ad set management
 ├── asset_agent.py               # Image/video upload & caching
 ├── ad_agent.py                  # Ad creative & ad management
+├── insights_agent.py            # Performance insights & analytics
 ├── operations.py                # Action handlers & dispatcher
 ├── .env                         # Your credentials
 ├── .asset_cache.json            # Uploaded assets cache
@@ -418,6 +531,9 @@ python3 main.py clear_asset_cache.json
 - Asset retrieval by hash/ID
 - Ad creative creation (flexible fields)
 - Ad creation & updates
+- **Performance insights** (account, campaign, ad set, ad levels)
+- **Performance reporting** (comprehensive analytics)
+- **Insights export** (JSON and CSV formats)
 - Three output modes (default, JSON, verbose)
 - Comprehensive error handling
 - Async/await architecture
