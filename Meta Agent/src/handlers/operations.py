@@ -6,16 +6,19 @@ Handles all operations via JSON action parameter
 import json
 import os
 import asyncio
-from campaign_adsets_agent import OrchestratorAgent, CampaignParams, create_adset_params_from_json, ValidationError
-from asset_agent import AssetValidationError, AssetUploadError
-from insights_agent import InsightsAgent, validate_date_preset, validate_breakdown
+
+from ..agents.orchestrator import OrchestratorAgent, create_adset_params_from_json
+from ..core.models import CampaignParams
+from ..core.exceptions import ValidationError
+from ..agents.asset_agent import AssetValidationError, AssetUploadError
+from ..agents.insights_agent import InsightsAgent, validate_date_preset, validate_breakdown
 
 # Global quiet flag for JSON-only output
 QUIET_MODE = False
 
 
-def set_quiet_mode(quiet: bool):
-    """Set quiet mode globally"""
+def set_operations_quiet_mode(quiet: bool):
+    """Set quiet mode globally for operations"""
     global QUIET_MODE
     QUIET_MODE = quiet
 
@@ -227,15 +230,15 @@ async def handle_update_adset(orchestrator: OrchestratorAgent, ad_account_id: st
         log_info(f"[INFO] Update type: {update_type}")
         
         if update_type == "pause":
-            await orchestrator.campaign_agent.update_campaign_status(adset_id, "PAUSED")
+            await orchestrator.campaign_agent.update_adset_status(adset_id, "PAUSED")
             log_info(f"\n✓ Ad set paused successfully")
             return {"status": "success", "action": "pause"}
         elif update_type == "active":
-            await orchestrator.campaign_agent.update_campaign_status(adset_id, "ACTIVE")
+            await orchestrator.campaign_agent.update_adset_status(adset_id, "ACTIVE")
             log_info(f"\n✓ Ad set activated successfully")
             return {"status": "success", "action": "active"}
         elif update_type == "delete":
-            await orchestrator.campaign_agent.update_campaign_status(adset_id, "DELETED")
+            await orchestrator.campaign_agent.update_adset_status(adset_id, "DELETED")
             log_info(f"\n✓ Ad set deleted successfully")
             return {"status": "success", "action": "delete"}
         else:
@@ -249,21 +252,27 @@ async def handle_update_adset(orchestrator: OrchestratorAgent, ad_account_id: st
 async def handle_get_adset(orchestrator: OrchestratorAgent, ad_account_id: str, payload: dict) -> dict:
     """Get ad set details"""
     log_section("GET AD SET")
-    
+
     try:
         adset_id = payload.get("adset_id")
-        
+
         if not adset_id:
             raise ValidationError("Missing 'adset_id' in payload")
-        
-        log_info(f"\n[INFO] Ad Set ID: {adset_id}")
-        log_info(f"[INFO] Listing campaigns for reference...")
-        
-        campaigns = await orchestrator.campaign_agent.list_campaigns(ad_account_id)
-        log_info(f"\n✓ Campaigns in account: {len(campaigns)}")
-        
-        return {"status": "success", "adset_id": adset_id, "campaigns_count": len(campaigns)}
-    
+
+        log_info(f"\n[INFO] Fetching ad set: {adset_id}")
+
+        adset_info = await orchestrator.campaign_agent.get_adset(adset_id)
+
+        log_info(f"\n✓ Ad set details:")
+        log_info(f"  ID: {adset_info.get('id')}")
+        log_info(f"  Name: {adset_info.get('name')}")
+        log_info(f"  Campaign ID: {adset_info.get('campaign_id')}")
+        log_info(f"  Status: {adset_info.get('status')}")
+        log_info(f"  Optimization Goal: {adset_info.get('optimization_goal')}")
+        log_info(f"  Created: {adset_info.get('created_time')}")
+
+        return {"status": "success", "adset": adset_info}
+
     except Exception as e:
         log_info(f"\n✗ Error: {e}")
         return {"status": "error", "message": str(e)}
@@ -295,7 +304,81 @@ async def handle_list_campaigns(orchestrator: OrchestratorAgent, ad_account_id: 
             })
         
         return {"status": "success", "campaigns": campaign_list, "count": len(campaigns)}
-    
+
+    except Exception as e:
+        log_info(f"\n✗ Error: {e}")
+        return {"status": "error", "message": str(e)}
+
+
+async def handle_list_adsets(orchestrator: OrchestratorAgent, ad_account_id: str, payload: dict) -> dict:
+    """List all ad sets in the ad account or under a specific campaign"""
+    log_section("LIST AD SETS")
+
+    try:
+        campaign_id = payload.get("campaign_id")
+        limit = payload.get("limit", 50)
+
+        adsets = await orchestrator.campaign_agent.list_adsets(ad_account_id, campaign_id, limit)
+
+        if not adsets:
+            return {"status": "success", "adsets": [], "count": 0}
+
+        adset_list = []
+        for adset in adsets:
+            # Handle both dict and object formats
+            adset_id = adset.get("id") if isinstance(adset, dict) else adset.id
+            adset_name = adset.get("name") if isinstance(adset, dict) else adset.name
+            adset_status = adset.get("status") if isinstance(adset, dict) else adset.status
+            adset_campaign_id = adset.get("campaign_id") if isinstance(adset, dict) else getattr(adset, 'campaign_id', None)
+            optimization_goal = adset.get("optimization_goal") if isinstance(adset, dict) else getattr(adset, 'optimization_goal', None)
+
+            adset_list.append({
+                "id": adset_id,
+                "name": adset_name,
+                "status": adset_status,
+                "campaign_id": adset_campaign_id,
+                "optimization_goal": optimization_goal
+            })
+
+        return {"status": "success", "adsets": adset_list, "count": len(adsets)}
+
+    except Exception as e:
+        log_info(f"\n✗ Error: {e}")
+        return {"status": "error", "message": str(e)}
+
+
+async def handle_list_ads(orchestrator: OrchestratorAgent, ad_account_id: str, payload: dict) -> dict:
+    """List all ads in the ad account or under a specific ad set"""
+    log_section("LIST ADS")
+
+    try:
+        adset_id = payload.get("adset_id")
+        limit = payload.get("limit", 50)
+
+        ads = await orchestrator.ad_agent.list_ads(ad_account_id, adset_id, limit)
+
+        if not ads:
+            return {"status": "success", "ads": [], "count": 0}
+
+        ad_list = []
+        for ad in ads:
+            # Handle both dict and object formats
+            ad_id = ad.get("id") if isinstance(ad, dict) else ad.id
+            ad_name = ad.get("name") if isinstance(ad, dict) else ad.name
+            ad_status = ad.get("status") if isinstance(ad, dict) else ad.status
+            ad_adset_id = ad.get("adset_id") if isinstance(ad, dict) else getattr(ad, 'adset_id', None)
+            effective_status = ad.get("effective_status") if isinstance(ad, dict) else getattr(ad, 'effective_status', None)
+
+            ad_list.append({
+                "id": ad_id,
+                "name": ad_name,
+                "status": ad_status,
+                "adset_id": ad_adset_id,
+                "effective_status": effective_status
+            })
+
+        return {"status": "success", "ads": ad_list, "count": len(ads)}
+
     except Exception as e:
         log_info(f"\n✗ Error: {e}")
         return {"status": "error", "message": str(e)}
@@ -753,7 +836,7 @@ async def handle_get_performance_report(orchestrator: OrchestratorAgent, ad_acco
         if report_type == "campaign":
             # Get all campaigns for the account and get their insights
             log_info(f"\n[INFO] Fetching campaigns insights...")
-            campaigns = await orchestrator.list_campaigns(ad_account_id)
+            campaigns = await orchestrator.campaign_agent.list_campaigns(ad_account_id)
             insights_data = []
             for campaign in campaigns:
                 try:
@@ -762,13 +845,13 @@ async def handle_get_performance_report(orchestrator: OrchestratorAgent, ad_acco
                     )
                     if "data" in response:
                         insights_data.extend(response["data"])
-                except:
-                    pass
-        
+                except Exception as e:
+                    log_info(f"[WARN] Failed to get insights for campaign {campaign.get('id')}: {e}")
+
         elif report_type == "adset":
             # Get all ad sets and their insights
             log_info(f"\n[INFO] Fetching ad sets insights...")
-            adsets = await orchestrator.list_adsets(ad_account_id)
+            adsets = await orchestrator.campaign_agent.list_adsets(ad_account_id)
             insights_data = []
             for adset in adsets:
                 try:
@@ -777,13 +860,13 @@ async def handle_get_performance_report(orchestrator: OrchestratorAgent, ad_acco
                     )
                     if "data" in response:
                         insights_data.extend(response["data"])
-                except:
-                    pass
-        
+                except Exception as e:
+                    log_info(f"[WARN] Failed to get insights for adset {adset.get('id')}: {e}")
+
         elif report_type == "ad":
             # Get all ads and their insights
             log_info(f"\n[INFO] Fetching ads insights...")
-            ads = await orchestrator.list_ads(ad_account_id)
+            ads = await orchestrator.ad_agent.list_ads(ad_account_id)
             insights_data = []
             for ad in ads:
                 try:
@@ -792,8 +875,8 @@ async def handle_get_performance_report(orchestrator: OrchestratorAgent, ad_acco
                     )
                     if "data" in response:
                         insights_data.extend(response["data"])
-                except:
-                    pass
+                except Exception as e:
+                    log_info(f"[WARN] Failed to get insights for ad {ad.get('id')}: {e}")
         
         # Generate report
         report = insights_agent.generate_performance_report(insights_data, report_type.capitalize())
@@ -833,28 +916,37 @@ async def handle_export_insights(orchestrator: OrchestratorAgent, ad_account_id:
         
         # Collect insights data based on type
         if insights_type == "campaign":
-            campaigns = await orchestrator.list_campaigns(ad_account_id)
+            campaigns = await orchestrator.campaign_agent.list_campaigns(ad_account_id)
             insights_data = []
             for campaign in campaigns:
-                response = await insights_agent.get_campaign_insights(campaign.get("id"), date_preset)
-                if "data" in response:
-                    insights_data.extend(response["data"])
-        
+                try:
+                    response = await insights_agent.get_campaign_insights(campaign.get("id"), date_preset)
+                    if "data" in response:
+                        insights_data.extend(response["data"])
+                except Exception as e:
+                    log_info(f"[WARN] Failed to get insights for campaign {campaign.get('id')}: {e}")
+
         elif insights_type == "adset":
-            adsets = await orchestrator.list_adsets(ad_account_id)
+            adsets = await orchestrator.campaign_agent.list_adsets(ad_account_id)
             insights_data = []
             for adset in adsets:
-                response = await insights_agent.get_adset_insights(adset.get("id"), date_preset)
-                if "data" in response:
-                    insights_data.extend(response["data"])
-        
+                try:
+                    response = await insights_agent.get_adset_insights(adset.get("id"), date_preset)
+                    if "data" in response:
+                        insights_data.extend(response["data"])
+                except Exception as e:
+                    log_info(f"[WARN] Failed to get insights for adset {adset.get('id')}: {e}")
+
         elif insights_type == "ad":
-            ads = await orchestrator.list_ads(ad_account_id)
+            ads = await orchestrator.ad_agent.list_ads(ad_account_id)
             insights_data = []
             for ad in ads:
-                response = await insights_agent.get_ad_insights(ad.get("id"), date_preset)
-                if "data" in response:
-                    insights_data.extend(response["data"])
+                try:
+                    response = await insights_agent.get_ad_insights(ad.get("id"), date_preset)
+                    if "data" in response:
+                        insights_data.extend(response["data"])
+                except Exception as e:
+                    log_info(f"[WARN] Failed to get insights for ad {ad.get('id')}: {e}")
         
         else:
             raise ValidationError(f"Invalid insights_type: {insights_type}")
@@ -899,6 +991,8 @@ async def process_action(orchestrator: OrchestratorAgent, ad_account_id: str, ac
         return await handle_update_adset(orchestrator, ad_account_id, action_payload)
     elif action == "get_adset":
         return await handle_get_adset(orchestrator, ad_account_id, action_payload)
+    elif action == "list_adsets":
+        return await handle_list_adsets(orchestrator, ad_account_id, action_payload)
     elif action == "upload_image":
         return await handle_upload_image(orchestrator, ad_account_id, action_payload)
     elif action == "upload_video":
@@ -919,6 +1013,8 @@ async def process_action(orchestrator: OrchestratorAgent, ad_account_id: str, ac
         return await handle_update_ad(orchestrator, ad_account_id, action_payload)
     elif action == "get_ad":
         return await handle_get_ad(orchestrator, ad_account_id, action_payload)
+    elif action == "list_ads":
+        return await handle_list_ads(orchestrator, ad_account_id, action_payload)
     elif action == "get_account_insights":
         return await handle_get_account_insights(orchestrator, ad_account_id, action_payload)
     elif action == "get_campaign_insights":
@@ -935,10 +1031,10 @@ async def process_action(orchestrator: OrchestratorAgent, ad_account_id: str, ac
         supported_actions = [
             "list_ad_accounts",
             "create_campaign", "update_campaign", "get_campaign", "list_campaigns",
-            "create_adset", "update_adset", "get_adset",
+            "create_adset", "update_adset", "get_adset", "list_adsets",
             "upload_image", "upload_video", "get_image", "get_video", "clear_asset_cache",
-            "create_creative", "get_creative", "create_ad", "update_ad", "get_ad",
-            "get_account_insights", "get_campaign_insights", "get_adset_insights", 
+            "create_creative", "get_creative", "create_ad", "update_ad", "get_ad", "list_ads",
+            "get_account_insights", "get_campaign_insights", "get_adset_insights",
             "get_ad_insights", "get_performance_report", "export_insights"
         ]
         error_msg = f"Unknown action: {action}. Supported: {', '.join(supported_actions)}"

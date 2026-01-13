@@ -1,0 +1,10 @@
+# Meta Ads Agent Dependencies
+
+# HTTP Client
+httpx>=0.24.0
+
+# Environment Variables
+python-dotenv>=1.0.0
+
+# Type hints (optional, for development)
+# typing-extensions>=4.0.0

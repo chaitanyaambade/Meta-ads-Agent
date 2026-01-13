@@ -1,3 +1,5 @@
 {
-  "action": "list_ad_accounts"
+  "ad_account_id": "1403619287901215",
+  "action": "get_account_insights",
+  "date_preset": "last_7d"
 }
