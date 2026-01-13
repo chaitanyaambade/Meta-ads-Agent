@@ -88,7 +88,6 @@ update_type options: "pause", "active", "delete"
   "campaign_id": "120244256006770196"
 }
 
-
 ================================================================================
  GET ADSET
 ================================================================================
@@ -100,7 +99,7 @@ update_type options: "pause", "active", "delete"
 }
 
 ================================================================================
-Upload image
+ Upload image
 ================================================================================
 
 {
@@ -112,7 +111,7 @@ Upload image
 }
 
 ================================================================================
-Upload video
+ Upload video
 ================================================================================
 
 {
@@ -228,3 +227,210 @@ upload_phase options: "start", "transfer", "finish", "cancel"
   }
 }
 
+================================================================================
+ GET ACCOUNT INSIGHTS
+================================================================================
+
+{
+  "ad_account_id": "120244256006770196",
+  "action": "get_account_insights",
+  "date_preset": "last_7d",
+  "fields": ["impressions", "clicks", "spend", "reach", "frequency", "ctr", "cpc", "cpm"]
+}
+
+Date Preset Options: last_7d, last_14d, last_28d, last_30d, last_90d, today, 
+                     yesterday, this_week, last_week, last_month, this_quarter, 
+                     last_3m, lifetime
+
+================================================================================
+ GET CAMPAIGN INSIGHTS
+================================================================================
+
+{
+  "ad_account_id": "120244256006770196",
+  "action": "get_campaign_insights",
+  "campaign_id": "120244256006770196",
+  "date_preset": "last_30d",
+  "breakdowns": ["age", "gender", "country"],
+  "fields": ["impressions", "clicks", "spend", "reach", "actions", "ctr", "cpc"]
+}
+
+Breakdown Options: age, gender, country, region, city, device, placement, platform, 
+                   audience_id, conversion_device, conversion_destination, frequency_value
+
+================================================================================
+ GET AD SET INSIGHTS
+================================================================================
+
+{
+  "ad_account_id": "120244256006770196",
+  "action": "get_adset_insights",
+  "adset_id": "120244255421590196",
+  "date_preset": "last_14d",
+  "breakdowns": ["device", "placement"],
+  "fields": ["impressions", "clicks", "spend", "reach", "ctr", "cpc", "cpm"]
+}
+
+================================================================================
+ GET AD INSIGHTS
+================================================================================
+
+{
+  "ad_account_id": "120244256006770196",
+  "action": "get_ad_insights",
+  "ad_id": "YOUR_AD_ID",
+  "date_preset": "last_7d",
+  "fields": ["impressions", "clicks", "spend", "reach", "frequency", "ctr", "cpc"]
+}
+
+================================================================================
+ GET PERFORMANCE REPORT
+================================================================================
+
+{
+  "ad_account_id": "120244256006770196",
+  "action": "get_performance_report",
+  "report_type": "campaign",
+  "date_preset": "last_30d"
+}
+
+Report Type Options: campaign, adset, ad
+
+This generates a comprehensive performance report with:
+- Total spend, impressions, clicks, conversions
+- Average CTR, CPC, CPM, ROAS
+- Detailed breakdown of each campaign/adset/ad metrics
+- Calculated performance indicators
+
+================================================================================
+ EXPORT INSIGHTS - JSON FORMAT
+================================================================================
+
+{
+  "ad_account_id": "120244256006770196",
+  "action": "export_insights",
+  "insights_type": "campaign",
+  "format": "json",
+  "date_preset": "last_30d",
+  "filename": "campaign_insights_march.json"
+}
+
+================================================================================
+ EXPORT INSIGHTS - CSV FORMAT
+================================================================================
+
+{
+  "ad_account_id": "120244256006770196",
+  "action": "export_insights",
+  "insights_type": "campaign",
+  "format": "csv",
+  "date_preset": "last_30d",
+  "filename": "campaign_insights_march.csv"
+}
+
+Export Format Options: json, csv
+Insights Type Options: campaign, adset, ad
+
+CSV Export is ideal for:
+- Spreadsheet analysis in Excel/Google Sheets
+- Data import into BI tools
+- Performance tracking
+
+JSON Export is ideal for:
+- API integration
+- Nested data preservation
+- Custom processing
+
+================================================================================
+ INSIGHTS QUICK REFERENCE
+================================================================================
+
+AVAILABLE METRICS FIELDS:
+- impressions: Number of times ad was displayed
+- clicks: Number of clicks on ad
+- spend: Amount spent in account currency
+- reach: Number of unique users reached
+- frequency: Average number of times ad shown to each person
+- ctr: Click-through rate (%)
+- cpc: Cost per click
+- cpm: Cost per thousand impressions
+- cpp: Cost per person
+- actions: Conversion actions
+- action_values: Monetary value of conversions
+- conversions: Total conversions
+- conversion_value: Total value of conversions
+
+AVAILABLE BREAKDOWNS:
+Demographics:
+  - age: User age brackets
+  - gender: User gender
+  - country: Country of user
+  - region: State/province of user
+  - city: City of user
+
+Device & Placement:
+  - device: Device type (mobile, desktop, etc.)
+  - placement: Where ad was shown (feed, right_column, etc.)
+  - platform: Platform (facebook, instagram, audience_network, etc.)
+
+Conversion:
+  - conversion_device: Device at time of conversion
+  - conversion_destination: Where conversion happened
+
+Other:
+  - audience_id: Custom audience ID
+  - frequency_value: Frequency bracket
+  - impression_device: Device when ad was shown
+
+DATE PRESETS - ALL OPTIONS:
+- last_7d: Last 7 days
+- last_14d: Last 14 days
+- last_28d: Last 28 days
+- last_30d: Last 30 days (default)
+- last_90d: Last 90 days
+- today: Today only
+- yesterday: Yesterday only
+- this_week: Current week
+- last_week: Previous week
+- last_month: Previous month
+- this_quarter: Current quarter
+- last_3m: Last 3 months
+- lifetime: All time data
+
+================================================================================
+ COMPLETE WORKFLOW EXAMPLE
+================================================================================
+
+Step 1: Get Account Insights
+{
+  "ad_account_id": "120244256006770196",
+  "action": "get_account_insights",
+  "date_preset": "last_7d"
+}
+
+Step 2: Get Campaign Insights with Demographic Breakdown
+{
+  "ad_account_id": "120244256006770196",
+  "action": "get_campaign_insights",
+  "campaign_id": "120244256006770196",
+  "date_preset": "last_7d",
+  "breakdowns": ["age", "gender", "country"]
+}
+
+Step 3: Generate Performance Report for All Campaigns
+{
+  "ad_account_id": "120244256006770196",
+  "action": "get_performance_report",
+  "report_type": "campaign",
+  "date_preset": "last_7d"
+}
+
+Step 4: Export Report to CSV for Analysis
+{
+  "ad_account_id": "120244256006770196",
+  "action": "export_insights",
+  "insights_type": "campaign",
+  "format": "csv",
+  "date_preset": "last_7d",
+  "filename": "weekly_campaign_performance.csv"
+}
