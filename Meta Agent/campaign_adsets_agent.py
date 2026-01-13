@@ -462,11 +462,17 @@ class OrchestratorAgent:
     """
     
     def __init__(self, access_token: str):
+        self._access_token = access_token
         self.api = MetaAPIClient(access_token)
         self.campaign_agent = CampaignAgent(self.api)
         self.asset_agent = AssetAgent(self.api)
         self.ad_agent = AdCreationAgent(self.api)
         log_debug("[Orchestrator] Initialized with Campaign Agent and Asset Agent")
+    
+    @property
+    def access_token(self) -> str:
+        """Get access token for use by other agents"""
+        return self._access_token
     
     async def validate_credentials(self, ad_account_id: str) -> bool:
         """Validate that credentials are valid by making a test API call"""
