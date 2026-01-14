@@ -5,13 +5,14 @@ Orchestrator Agent - Central coordination agent for META marketing operations
 from typing import Dict, Any, List
 
 from ..core.api_client import MetaAPIClient
-from ..core.models import CampaignParams, AdSetParams, Campaign
+from ..core.models import CampaignParams, AdSetParams, Campaign, LeadFormParams
 from ..core.exceptions import ValidationError
 from ..core.utils import log_debug
 
 from .campaign_agent import CampaignAgent
 from .asset_agent import AssetAgent
 from .ad_agent import AdCreationAgent
+from .lead_form_agent import LeadFormAgent
 
 
 class OrchestratorAgent:
@@ -25,7 +26,8 @@ class OrchestratorAgent:
         self.campaign_agent = CampaignAgent(self.api)
         self.asset_agent = AssetAgent(self.api)
         self.ad_agent = AdCreationAgent(self.api)
-        log_debug("[Orchestrator] Initialized with Campaign Agent, Asset Agent, and Ad Agent")
+        self.lead_form_agent = LeadFormAgent(self.api)
+        log_debug("[Orchestrator] Initialized with Campaign Agent, Asset Agent, Ad Agent, and Lead Form Agent")
 
     @property
     def access_token(self) -> str:
@@ -317,3 +319,23 @@ def create_adset_params_from_json(json_data: Dict) -> AdSetParams:
         raise
     except Exception as e:
         raise ValidationError(f"Failed to create ad set params from JSON: {str(e)}")
+
+
+def create_lead_form_params_from_json(json_data: Dict) -> LeadFormParams:
+    """
+    Create LeadFormParams from JSON data
+
+    Args:
+        json_data: Dictionary with lead form parameters
+
+    Returns:
+        LeadFormParams object
+    """
+    try:
+        lead_form_params = LeadFormParams(**json_data)
+        return lead_form_params
+
+    except ValidationError:
+        raise
+    except Exception as e:
+        raise ValidationError(f"Failed to create lead form params from JSON: {str(e)}")

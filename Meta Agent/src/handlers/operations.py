@@ -7,7 +7,7 @@ import json
 import os
 import asyncio
 
-from ..agents.orchestrator import OrchestratorAgent, create_adset_params_from_json
+from ..agents.orchestrator import OrchestratorAgent, create_adset_params_from_json, create_lead_form_params_from_json
 from ..core.models import CampaignParams
 from ..core.exceptions import ValidationError
 from ..agents.asset_agent import AssetValidationError, AssetUploadError
@@ -971,6 +971,199 @@ async def handle_export_insights(orchestrator: OrchestratorAgent, ad_account_id:
         return {"status": "error", "message": str(e)}
 
 
+# ============================================================================
+# LEAD FORM OPERATIONS
+# ============================================================================
+
+async def handle_create_lead_form(orchestrator: OrchestratorAgent, ad_account_id: str, payload: dict) -> dict:
+    """Create a lead form on a Facebook Page"""
+    log_section("CREATE LEAD FORM")
+
+    try:
+        # IMPORTANT: Lead forms require page_id, not ad_account_id
+        page_id = payload.get("page_id")
+        if not page_id:
+            raise ValidationError("Missing 'page_id' in payload. Lead forms are created on Pages, not Ad Accounts.")
+
+        lead_form_json = payload.get("lead_form")
+        if not lead_form_json:
+            raise ValidationError("Missing 'lead_form' object in payload")
+
+        log_info(f"\n[INFO] Page ID: {page_id}")
+        log_info(f"[INFO] Form name: {lead_form_json.get('name')}")
+        log_info(f"[INFO] Questions count: {len(lead_form_json.get('questions', []))}")
+
+        lead_form_params = create_lead_form_params_from_json(lead_form_json)
+        lead_form = await orchestrator.lead_form_agent.create_lead_form(page_id, lead_form_params)
+
+        log_info(f"\n✓ Lead form created successfully")
+        log_info(f"✓ Form ID: {lead_form.id}")
+        log_info(f"✓ Form Name: {lead_form.name}")
+
+        return {
+            "status": "success",
+            "form_id": lead_form.id,
+            "name": lead_form.name,
+            "page_id": page_id
+        }
+
+    except Exception as e:
+        log_info(f"\n✗ Error: {e}")
+        return {"status": "error", "message": str(e)}
+
+
+async def handle_get_lead_form(orchestrator: OrchestratorAgent, ad_account_id: str, payload: dict) -> dict:
+    """Get lead form details"""
+    log_section("GET LEAD FORM")
+
+    try:
+        form_id = payload.get("form_id")
+        if not form_id:
+            raise ValidationError("Missing 'form_id' in payload")
+
+        log_info(f"\n[INFO] Fetching lead form: {form_id}")
+
+        form_data = await orchestrator.lead_form_agent.get_lead_form(form_id)
+
+        log_info(f"\n✓ Lead form retrieved:")
+        log_info(f"  ID: {form_data.get('id')}")
+        log_info(f"  Name: {form_data.get('name')}")
+        log_info(f"  Status: {form_data.get('status')}")
+
+        return {"status": "success", "lead_form": form_data}
+
+    except Exception as e:
+        log_info(f"\n✗ Error: {e}")
+        return {"status": "error", "message": str(e)}
+
+
+async def handle_list_lead_forms(orchestrator: OrchestratorAgent, ad_account_id: str, payload: dict) -> dict:
+    """List all lead forms for a page"""
+    log_section("LIST LEAD FORMS")
+
+    try:
+        # Lead forms are listed by page_id
+        page_id = payload.get("page_id")
+        if not page_id:
+            raise ValidationError("Missing 'page_id' in payload. Lead forms are listed by Page ID.")
+
+        limit = payload.get("limit", 50)
+
+        log_info(f"\n[INFO] Page ID: {page_id}")
+
+        forms = await orchestrator.lead_form_agent.list_lead_forms(page_id, limit)
+
+        if not forms:
+            log_info(f"\n[INFO] No lead forms found for page {page_id}")
+            return {"status": "success", "lead_forms": [], "count": 0}
+
+        form_list = []
+        for form in forms:
+            form_list.append({
+                "id": form.get("id"),
+                "name": form.get("name"),
+                "status": form.get("status"),
+                "locale": form.get("locale"),
+                "leads_count": form.get("leads_count"),
+                "created_time": form.get("created_time")
+            })
+
+        log_info(f"\n✓ Found {len(forms)} lead form(s)")
+
+        return {"status": "success", "lead_forms": form_list, "count": len(forms)}
+
+    except Exception as e:
+        log_info(f"\n✗ Error: {e}")
+        return {"status": "error", "message": str(e)}
+
+
+async def handle_get_leads(orchestrator: OrchestratorAgent, ad_account_id: str, payload: dict) -> dict:
+    """Get leads from a lead form"""
+    log_section("GET LEADS")
+
+    try:
+        form_id = payload.get("form_id")
+        if not form_id:
+            raise ValidationError("Missing 'form_id' in payload")
+
+        limit = payload.get("limit", 100)
+
+        log_info(f"\n[INFO] Form ID: {form_id}")
+        log_info(f"[INFO] Limit: {limit}")
+
+        leads = await orchestrator.lead_form_agent.get_leads(form_id, limit)
+
+        if not leads:
+            log_info(f"\n[INFO] No leads found for form {form_id}")
+            return {"status": "success", "leads": [], "count": 0}
+
+        lead_list = []
+        for lead in leads:
+            # Parse field_data into a more usable format
+            field_data = {}
+            for field in lead.get("field_data", []):
+                field_data[field.get("name")] = field.get("values", [])
+
+            lead_list.append({
+                "id": lead.get("id"),
+                "created_time": lead.get("created_time"),
+                "field_data": field_data,
+                "ad_id": lead.get("ad_id"),
+                "ad_name": lead.get("ad_name"),
+                "adset_id": lead.get("adset_id"),
+                "campaign_id": lead.get("campaign_id")
+            })
+
+        log_info(f"\n✓ Found {len(leads)} lead(s)")
+
+        return {"status": "success", "leads": lead_list, "count": len(leads)}
+
+    except Exception as e:
+        log_info(f"\n✗ Error: {e}")
+        return {"status": "error", "message": str(e)}
+
+
+async def handle_get_lead(orchestrator: OrchestratorAgent, ad_account_id: str, payload: dict) -> dict:
+    """Get single lead details"""
+    log_section("GET LEAD")
+
+    try:
+        lead_id = payload.get("lead_id")
+        if not lead_id:
+            raise ValidationError("Missing 'lead_id' in payload")
+
+        log_info(f"\n[INFO] Fetching lead: {lead_id}")
+
+        lead_data = await orchestrator.lead_form_agent.get_lead(lead_id)
+
+        # Parse field_data into a more usable format
+        field_data = {}
+        for field in lead_data.get("field_data", []):
+            field_data[field.get("name")] = field.get("values", [])
+
+        result = {
+            "id": lead_data.get("id"),
+            "created_time": lead_data.get("created_time"),
+            "field_data": field_data,
+            "form_id": lead_data.get("form_id"),
+            "ad_id": lead_data.get("ad_id"),
+            "ad_name": lead_data.get("ad_name"),
+            "adset_id": lead_data.get("adset_id"),
+            "adset_name": lead_data.get("adset_name"),
+            "campaign_id": lead_data.get("campaign_id"),
+            "campaign_name": lead_data.get("campaign_name"),
+            "is_organic": lead_data.get("is_organic")
+        }
+
+        log_info(f"\n✓ Lead retrieved: {lead_id}")
+
+        return {"status": "success", "lead": result}
+
+    except Exception as e:
+        log_info(f"\n✗ Error: {e}")
+        return {"status": "error", "message": str(e)}
+
+
 async def process_action(orchestrator: OrchestratorAgent, ad_account_id: str, action_payload: dict) -> dict:
     """Main action dispatcher - routes to appropriate handler"""
     action = action_payload.get("action", "").lower()
@@ -1027,6 +1220,17 @@ async def process_action(orchestrator: OrchestratorAgent, ad_account_id: str, ac
         return await handle_get_performance_report(orchestrator, ad_account_id, action_payload)
     elif action == "export_insights":
         return await handle_export_insights(orchestrator, ad_account_id, action_payload)
+    # Lead Form Operations
+    elif action == "create_lead_form":
+        return await handle_create_lead_form(orchestrator, ad_account_id, action_payload)
+    elif action == "get_lead_form":
+        return await handle_get_lead_form(orchestrator, ad_account_id, action_payload)
+    elif action == "list_lead_forms":
+        return await handle_list_lead_forms(orchestrator, ad_account_id, action_payload)
+    elif action == "get_leads":
+        return await handle_get_leads(orchestrator, ad_account_id, action_payload)
+    elif action == "get_lead":
+        return await handle_get_lead(orchestrator, ad_account_id, action_payload)
     else:
         supported_actions = [
             "list_ad_accounts",
@@ -1035,7 +1239,8 @@ async def process_action(orchestrator: OrchestratorAgent, ad_account_id: str, ac
             "upload_image", "upload_video", "get_image", "get_video", "clear_asset_cache",
             "create_creative", "get_creative", "create_ad", "update_ad", "get_ad", "list_ads",
             "get_account_insights", "get_campaign_insights", "get_adset_insights",
-            "get_ad_insights", "get_performance_report", "export_insights"
+            "get_ad_insights", "get_performance_report", "export_insights",
+            "create_lead_form", "get_lead_form", "list_lead_forms", "get_leads", "get_lead"
         ]
         error_msg = f"Unknown action: {action}. Supported: {', '.join(supported_actions)}"
         log_info(f"\n✗ {error_msg}")
