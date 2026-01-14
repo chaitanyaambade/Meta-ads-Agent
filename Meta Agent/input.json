@@ -1,4 +1,7 @@
+
 {
-  "ad_account_id": "1403619287901215",
-  "action": "list_adsets"
+  "ad_account_id": "852230740880305",
+  "action": "update_campaign",
+  "campaign_id": "120242459744210655",
+  "update_type": "delete"
 }
