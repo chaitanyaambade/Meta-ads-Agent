@@ -10,6 +10,7 @@ Meta Ads Agent provides a modular, asynchronous architecture for managing:
 - **Assets** — Upload, validate, and cache images and videos
 - **Creatives** — Create ad creatives with flexible specifications
 - **Ads** — Create, update, and manage ads linked to creatives
+- **Lead Forms** — Create lead forms, retrieve leads for lead generation campaigns
 - **Insights** — Fetch, analyze, and export performance data
 
 ---
@@ -43,6 +44,7 @@ Meta Agent/
 │   │   ├── campaign_agent.py    # Campaign & ad set management
 │   │   ├── asset_agent.py       # Image/video upload & caching
 │   │   ├── ad_agent.py          # Ad creative & ad management
+│   │   ├── lead_form_agent.py   # Lead form & leads management
 │   │   └── insights_agent.py    # Performance data & analytics
 │   │
 │   └── handlers/                # Action handlers
@@ -61,6 +63,7 @@ OrchestratorAgent (Main Coordinator)
 ├── CampaignAgent        → Campaign & ad set CRUD
 ├── AssetAgent           → Image & video upload/retrieval/cache
 ├── AdCreationAgent      → Ad creative & ad management
+├── LeadFormAgent        → Lead form creation & leads retrieval
 └── InsightsAgent        → Performance data & analytics
 
 MetaAPIClient (Async HTTP wrapper for Meta Graph API)
@@ -103,14 +106,14 @@ python3 main.py --verbose create_campaign.json
 
 ---
 
-## 📋 Supported Operations (26 Total)
+## 📋 Supported Operations (31 Total)
 
 ### Account Operations (1)
 | Action | Purpose | Returns |
 |--------|---------|---------|
 | `list_ad_accounts` | List all ad accounts | Array of ad account objects |
 
-### Campaign Operations (5)
+### Campaign Operations (4)
 | Action | Purpose |
 |--------|---------|
 | `create_campaign` | Create new advertising campaign |
@@ -154,6 +157,17 @@ python3 main.py --verbose create_campaign.json
 | `get_ad_insights` | Fetch ad-level performance metrics | ad_id, date_preset |
 | `get_performance_report` | Generate comprehensive performance report | report_type, date_preset |
 | `export_insights` | Export insights to JSON or CSV | insights_type, format, date_preset |
+
+### Lead Form Operations (5)
+| Action | Purpose | Required Fields |
+|--------|---------|-----------------|
+| `create_lead_form` | Create a lead form on a Facebook Page | page_id, lead_form |
+| `get_lead_form` | Get lead form details | form_id |
+| `list_lead_forms` | List all lead forms for a page | page_id |
+| `get_leads` | Get all leads from a form | form_id |
+| `get_lead` | Get single lead details | lead_id |
+
+**Note:** Lead forms are created on Facebook **Pages**, not Ad Accounts. You must provide a `page_id`.
 
 ---
 
@@ -493,6 +507,159 @@ Export performance data to JSON or CSV:
 
 ---
 
+## 📝 Lead Form Operations
+
+Lead forms are used with Lead Generation campaigns to collect user information directly on Facebook/Instagram.
+
+### Create Lead Form
+Create a lead form on a Facebook Page:
+```json
+{
+  "ad_account_id": "120244256006770196",
+  "action": "create_lead_form",
+  "page_id": "864501833422699",
+  "lead_form": {
+    "name": "Contact Us Form",
+    "locale": "en_US",
+    "questions": [
+      {"type": "EMAIL"},
+      {"type": "PHONE"},
+      {"type": "FULL_NAME"}
+    ],
+    "privacy_policy": {
+      "url": "https://example.com/privacy"
+    },
+    "follow_up_action_url": "https://example.com/thank-you"
+  }
+}
+```
+
+With custom questions and intro screen:
+```json
+{
+  "ad_account_id": "120244256006770196",
+  "action": "create_lead_form",
+  "page_id": "864501833422699",
+  "lead_form": {
+    "name": "Product Interest Form",
+    "locale": "en_US",
+    "questions": [
+      {"type": "EMAIL"},
+      {"type": "PHONE"},
+      {
+        "type": "CUSTOM",
+        "key": "service",
+        "label": "Which service interests you?",
+        "options": [
+          {"value": "Web Development", "key": "web"},
+          {"value": "Mobile App", "key": "mobile"}
+        ]
+      }
+    ],
+    "privacy_policy": {
+      "url": "https://example.com/privacy"
+    },
+    "intro": {
+      "title": "Get a Free Quote",
+      "description": "Fill out this form and we'll contact you."
+    },
+    "thank_you_page": {
+      "title": "Thank You!",
+      "body": "We'll be in touch soon.",
+      "button_text": "Visit Website",
+      "button_url": "https://example.com"
+    }
+  }
+}
+```
+
+### List Lead Forms
+List all lead forms for a page:
+```json
+{
+  "ad_account_id": "120244256006770196",
+  "action": "list_lead_forms",
+  "page_id": "864501833422699"
+}
+```
+
+### Get Lead Form Details
+```json
+{
+  "ad_account_id": "120244256006770196",
+  "action": "get_lead_form",
+  "form_id": "1234567890123456"
+}
+```
+
+### Get Leads from Form
+Retrieve all leads submitted through a form:
+```json
+{
+  "ad_account_id": "120244256006770196",
+  "action": "get_leads",
+  "form_id": "1234567890123456",
+  "limit": 100
+}
+```
+
+### Get Single Lead
+```json
+{
+  "ad_account_id": "120244256006770196",
+  "action": "get_lead",
+  "lead_id": "9876543210987654"
+}
+```
+
+### Create Creative with Lead Form
+After creating a lead form, use it in a creative:
+```json
+{
+  "ad_account_id": "120244256006770196",
+  "action": "create_creative",
+  "creative": {
+    "name": "Lead Gen Creative",
+    "object_story_spec": {
+      "page_id": "864501833422699",
+      "link_data": {
+        "message": "Sign up today!",
+        "link": "https://example.com",
+        "call_to_action": {
+          "type": "SIGN_UP",
+          "value": {
+            "lead_gen_form_id": "1234567890123456"
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+### Available Question Types
+| Type | Description | Auto-filled |
+|------|-------------|-------------|
+| `EMAIL` | Email address | Yes |
+| `PHONE` | Phone number | Yes |
+| `FULL_NAME` | Full name | Yes |
+| `FIRST_NAME` | First name | Yes |
+| `LAST_NAME` | Last name | Yes |
+| `CITY` | City | Yes |
+| `STATE` | State/Province | Yes |
+| `COUNTRY` | Country | Yes |
+| `ZIP` | Zip/Postal code | Yes |
+| `DOB` | Date of birth | Yes |
+| `GENDER` | Gender | Yes |
+| `JOB_TITLE` | Job title | Yes |
+| `COMPANY_NAME` | Company name | Yes |
+| `CUSTOM` | Custom question | No |
+
+### Call-to-Action Types for Lead Forms
+- `SIGN_UP`, `LEARN_MORE`, `GET_QUOTE`, `SUBSCRIBE`, `APPLY_NOW`, `CONTACT_US`
+
+---
+
 ## 📊 Asset Specifications
 
 ### Images
@@ -570,6 +737,23 @@ python3 main.py clear_asset_cache.json
 }
 ```
 
+### object_story_spec (Lead Form Ads)
+```json
+{
+  "page_id": "YOUR_PAGE_ID",
+  "link_data": {
+    "message": "Sign up for a free consultation!",
+    "link": "https://example.com",
+    "call_to_action": {
+      "type": "SIGN_UP",
+      "value": {
+        "lead_gen_form_id": "YOUR_LEAD_FORM_ID"
+      }
+    }
+  }
+}
+```
+
 ### asset_feed_spec (Dynamic Creative)
 ```json
 {
@@ -609,7 +793,9 @@ python3 main.py clear_asset_cache.json
 - Video upload with validation & caching
 - Asset retrieval by hash/ID
 - Ad creative creation (flexible fields)
-- **List operations** (ad accounts, campaigns, ad sets, ads)
+- **Lead form creation & management**
+- **Leads retrieval from forms**
+- **List operations** (ad accounts, campaigns, ad sets, ads, lead forms)
 - **Performance insights** (account, campaign, ad set, ad levels)
 - **Performance reporting** (comprehensive analytics)
 - **Insights export** (JSON and CSV formats)

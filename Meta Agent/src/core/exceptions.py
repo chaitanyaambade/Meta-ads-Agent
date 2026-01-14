@@ -50,3 +50,8 @@ class CreativeError(AdAgentError):
 class AdCreationError(AdAgentError):
     """Ad creation failed"""
     pass
+
+
+class LeadFormError(MetaAgentError):
+    """Lead form creation/retrieval failed"""
+    pass

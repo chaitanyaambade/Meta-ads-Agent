@@ -4,7 +4,7 @@ Data models for META Marketing Agent System
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 
 from .exceptions import ValidationError
 
@@ -167,3 +167,119 @@ class Ad:
     id: str
     name: str
     data: Dict[str, Any]
+
+
+class LeadFormQuestionType(str, Enum):
+    """Valid lead form question types"""
+    EMAIL = "EMAIL"
+    PHONE = "PHONE"
+    FULL_NAME = "FULL_NAME"
+    FIRST_NAME = "FIRST_NAME"
+    LAST_NAME = "LAST_NAME"
+    CITY = "CITY"
+    STATE = "STATE"
+    COUNTRY = "COUNTRY"
+    ZIP = "ZIP"
+    STREET_ADDRESS = "STREET_ADDRESS"
+    POST_CODE = "POST_CODE"
+    DATE_OF_BIRTH = "DATE_OF_BIRTH"
+    DOB = "DOB"
+    GENDER = "GENDER"
+    MARITAL_STATUS = "MARITAL_STATUS"
+    RELATIONSHIP_STATUS = "RELATIONSHIP_STATUS"
+    MILITARY_STATUS = "MILITARY_STATUS"
+    WORK_EMAIL = "WORK_EMAIL"
+    WORK_PHONE_NUMBER = "WORK_PHONE_NUMBER"
+    JOB_TITLE = "JOB_TITLE"
+    COMPANY_NAME = "COMPANY_NAME"
+    CUSTOM = "CUSTOM"
+
+
+class LeadFormParams:
+    """Lead form creation parameters - accepts any fields from JSON"""
+
+    def __init__(self, **kwargs):
+        """
+        Initialize with lead form parameters
+
+        Args:
+            **kwargs: Lead form parameters (name, questions, privacy_policy, etc.)
+        """
+        # Required fields
+        if "name" not in kwargs:
+            raise ValidationError("Lead form 'name' is required")
+        if "questions" not in kwargs:
+            raise ValidationError("Lead form 'questions' is required")
+        if "privacy_policy" not in kwargs:
+            raise ValidationError("Lead form 'privacy_policy' is required")
+
+        # Validate privacy_policy has url
+        privacy_policy = kwargs.get("privacy_policy", {})
+        if not isinstance(privacy_policy, dict) or "url" not in privacy_policy:
+            raise ValidationError("Lead form 'privacy_policy.url' is required")
+
+        # Store all fields
+        self.params = kwargs
+
+        # Set defaults
+        if "locale" not in self.params:
+            self.params["locale"] = "en_US"
+
+        # Validate questions array
+        self._validate_questions(self.params.get("questions", []))
+
+    def _validate_questions(self, questions: list):
+        """Validate questions array structure"""
+        if not isinstance(questions, list) or len(questions) == 0:
+            raise ValidationError("Lead form 'questions' must be a non-empty array")
+
+        for idx, question in enumerate(questions):
+            if not isinstance(question, dict):
+                raise ValidationError(f"Question {idx} must be an object")
+            if "type" not in question:
+                raise ValidationError(f"Question {idx} missing 'type' field")
+
+    @property
+    def name(self) -> str:
+        return self.params.get("name")
+
+    @property
+    def questions(self) -> list:
+        return self.params.get("questions", [])
+
+    @property
+    def privacy_policy(self) -> dict:
+        return self.params.get("privacy_policy", {})
+
+    @property
+    def locale(self) -> str:
+        return self.params.get("locale", "en_US")
+
+    def to_api_dict(self) -> Dict:
+        """Convert to API request format"""
+        return self.params.copy()
+
+
+@dataclass
+class LeadForm:
+    """Lead form response model"""
+    id: str
+    name: str
+    status: str
+    page_id: str
+    locale: Optional[str] = None
+    questions: Optional[List[Dict[str, Any]]] = None
+    created_time: Optional[str] = None
+
+
+@dataclass
+class Lead:
+    """Lead response model"""
+    id: str
+    form_id: str
+    created_time: str
+    field_data: Dict[str, Any]
+    ad_id: Optional[str] = None
+    ad_name: Optional[str] = None
+    adset_id: Optional[str] = None
+    campaign_id: Optional[str] = None
