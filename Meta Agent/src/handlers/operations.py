@@ -677,138 +677,312 @@ async def handle_get_account_insights(orchestrator: OrchestratorAgent, ad_accoun
 
 
 async def handle_get_campaign_insights(orchestrator: OrchestratorAgent, ad_account_id: str, payload: dict) -> dict:
-    """Get campaign level insights"""
+    """Get campaign level insights with enhanced metrics"""
     log_section("GET CAMPAIGN INSIGHTS")
-    
+
     try:
         insights_agent = InsightsAgent(orchestrator.access_token)
-        
+
         campaign_id = payload.get("campaign_id")
         if not campaign_id:
             raise ValidationError("Missing 'campaign_id' in payload")
-        
+
         date_preset = payload.get("date_preset", "last_7d")
         fields = payload.get("fields")
         breakdowns = payload.get("breakdowns")
-        
+        include_enhanced = payload.get("include_enhanced", True)  # Default to True
+
         # Validate date preset
         if not validate_date_preset(date_preset):
             raise ValidationError(f"Invalid date_preset: {date_preset}")
-        
+
         # Validate breakdowns if provided
         if breakdowns:
             for breakdown in breakdowns:
                 if not validate_breakdown(breakdown):
                     log_info(f"\n[WARNING] Unknown breakdown: {breakdown} (will attempt anyway)")
-        
+
         log_info(f"\n[INFO] Campaign ID: {campaign_id}")
         log_info(f"[INFO] Date preset: {date_preset}")
         if breakdowns:
             log_info(f"[INFO] Breakdowns: {', '.join(breakdowns)}")
-        
+
         response = await insights_agent.get_campaign_insights(campaign_id, date_preset, fields, breakdowns)
-        
-        log_info(f"\n✓ Campaign insights retrieved successfully")
-        
-        return {
+
+        result = {
             "status": "success",
             "insights_type": "campaign",
             "campaign_id": campaign_id,
             "data": response
         }
-    
+
+        # Add enhanced metrics if requested
+        if include_enhanced:
+            # Parse base insights data
+            insights_data = response.get("data", [{}])[0] if response.get("data") else {}
+            actions = insights_data.get("actions", [])
+            primary_result = insights_agent.extract_primary_result(actions)
+            spend = float(insights_data.get("spend", 0))
+            current_cpr = spend / primary_result["count"] if primary_result["count"] > 0 else 0
+
+            # Initialize enhanced metrics with base data
+            result["enhanced_metrics"] = {
+                "spend": {
+                    "total": spend,
+                    "daily_average": spend / 7 if spend > 0 else 0
+                },
+                "primary_conversion": {
+                    "type": primary_result["type"],
+                    "count": primary_result["count"]
+                },
+                "cost_per_result": {
+                    "current": round(current_cpr, 2),
+                    "rolling_7d": 0.0
+                },
+                "results_per_day": 0.0,
+                "frequency": float(insights_data.get("frequency", 0)),
+                "link_ctr": float(insights_data.get("inline_link_click_ctr", 0)),
+                "cpm": {
+                    "current": float(insights_data.get("cpm", 0)),
+                    "trend": "insufficient_data",
+                    "change_percent": 0.0
+                }
+            }
+
+            # Try to get daily insights for rolling calculations
+            try:
+                daily_insights = await insights_agent.get_daily_insights(campaign_id, "campaign", days=7)
+                rolling_cpr = insights_agent.calculate_rolling_cost_per_result(daily_insights)
+                results_per_day = insights_agent.calculate_results_per_day(daily_insights)
+                cpm_trend = insights_agent.calculate_cpm_trend(daily_insights)
+
+                result["enhanced_metrics"]["cost_per_result"]["rolling_7d"] = round(rolling_cpr, 2)
+                result["enhanced_metrics"]["results_per_day"] = round(results_per_day, 2)
+                result["enhanced_metrics"]["cpm"]["trend"] = cpm_trend.get("trend")
+                result["enhanced_metrics"]["cpm"]["change_percent"] = cpm_trend.get("change_percent", 0)
+            except Exception as e:
+                log_info(f"[WARNING] Could not fetch daily insights: {e}")
+
+            log_info(f"✓ Enhanced metrics included")
+
+        log_info(f"\n✓ Campaign insights retrieved successfully")
+
+        return result
+
     except Exception as e:
         log_info(f"\n✗ Error: {e}")
         return {"status": "error", "message": str(e)}
 
 
 async def handle_get_adset_insights(orchestrator: OrchestratorAgent, ad_account_id: str, payload: dict) -> dict:
-    """Get ad set level insights"""
+    """Get ad set level insights with enhanced metrics including learning phase"""
     log_section("GET AD SET INSIGHTS")
-    
+
     try:
         insights_agent = InsightsAgent(orchestrator.access_token)
-        
+
         adset_id = payload.get("adset_id")
         if not adset_id:
             raise ValidationError("Missing 'adset_id' in payload")
-        
+
         date_preset = payload.get("date_preset", "last_7d")
         fields = payload.get("fields")
         breakdowns = payload.get("breakdowns")
-        
+        include_enhanced = payload.get("include_enhanced", True)  # Default to True
+
         # Validate date preset
         if not validate_date_preset(date_preset):
             raise ValidationError(f"Invalid date_preset: {date_preset}")
-        
+
         # Validate breakdowns if provided
         if breakdowns:
             for breakdown in breakdowns:
                 if not validate_breakdown(breakdown):
                     log_info(f"\n[WARNING] Unknown breakdown: {breakdown} (will attempt anyway)")
-        
+
         log_info(f"\n[INFO] Ad Set ID: {adset_id}")
         log_info(f"[INFO] Date preset: {date_preset}")
         if breakdowns:
             log_info(f"[INFO] Breakdowns: {', '.join(breakdowns)}")
-        
+
         response = await insights_agent.get_adset_insights(adset_id, date_preset, fields, breakdowns)
-        
-        log_info(f"\n✓ Ad set insights retrieved successfully")
-        
-        return {
+
+        result = {
             "status": "success",
             "insights_type": "adset",
             "adset_id": adset_id,
             "data": response
         }
-    
+
+        # Add enhanced metrics if requested
+        if include_enhanced:
+            # Parse base insights data
+            insights_data = response.get("data", [{}])[0] if response.get("data") else {}
+            actions = insights_data.get("actions", [])
+            primary_result = insights_agent.extract_primary_result(actions)
+            spend = float(insights_data.get("spend", 0))
+            current_cpr = spend / primary_result["count"] if primary_result["count"] > 0 else 0
+
+            # Initialize enhanced metrics with base data
+            result["enhanced_metrics"] = {
+                "spend": {
+                    "total": spend,
+                    "daily_average": spend / 7 if spend > 0 else 0
+                },
+                "primary_conversion": {
+                    "type": primary_result["type"],
+                    "count": primary_result["count"]
+                },
+                "cost_per_result": {
+                    "current": round(current_cpr, 2),
+                    "rolling_7d": 0.0
+                },
+                "results_per_day": 0.0,
+                "learning_phase": {
+                    "status": "UNKNOWN",
+                    "is_in_learning": False,
+                    "actions_remaining": 0
+                },
+                "frequency": float(insights_data.get("frequency", 0)),
+                "link_ctr": float(insights_data.get("inline_link_click_ctr", 0)),
+                "cpm": {
+                    "current": float(insights_data.get("cpm", 0)),
+                    "trend": "insufficient_data",
+                    "change_percent": 0.0
+                }
+            }
+
+            # Try to get learning phase status (separate try/except)
+            try:
+                learning_phase = await insights_agent.get_adset_learning_phase(adset_id)
+                result["enhanced_metrics"]["learning_phase"] = {
+                    "status": learning_phase.get("learning_phase_status", "UNKNOWN"),
+                    "is_in_learning": learning_phase.get("is_in_learning", False),
+                    "actions_remaining": learning_phase.get("actions_remaining", 0)
+                }
+                log_info(f"✓ Learning phase: {learning_phase.get('learning_phase_status')}")
+            except Exception as e:
+                log_info(f"[WARNING] Could not fetch learning phase: {e}")
+
+            # Try to get daily insights for rolling calculations (separate try/except)
+            try:
+                daily_insights = await insights_agent.get_daily_insights(adset_id, "adset", days=7)
+                rolling_cpr = insights_agent.calculate_rolling_cost_per_result(daily_insights)
+                results_per_day = insights_agent.calculate_results_per_day(daily_insights)
+                cpm_trend = insights_agent.calculate_cpm_trend(daily_insights)
+
+                result["enhanced_metrics"]["cost_per_result"]["rolling_7d"] = round(rolling_cpr, 2)
+                result["enhanced_metrics"]["results_per_day"] = round(results_per_day, 2)
+                result["enhanced_metrics"]["cpm"]["trend"] = cpm_trend.get("trend")
+                result["enhanced_metrics"]["cpm"]["change_percent"] = cpm_trend.get("change_percent", 0)
+                log_info(f"✓ Rolling metrics calculated")
+            except Exception as e:
+                log_info(f"[WARNING] Could not fetch daily insights: {e}")
+
+            log_info(f"✓ Enhanced metrics included")
+
+        log_info(f"\n✓ Ad set insights retrieved successfully")
+
+        return result
+
     except Exception as e:
         log_info(f"\n✗ Error: {e}")
         return {"status": "error", "message": str(e)}
 
 
 async def handle_get_ad_insights(orchestrator: OrchestratorAgent, ad_account_id: str, payload: dict) -> dict:
-    """Get ad level insights"""
+    """Get ad level insights with enhanced metrics"""
     log_section("GET AD INSIGHTS")
-    
+
     try:
         insights_agent = InsightsAgent(orchestrator.access_token)
-        
+
         ad_id = payload.get("ad_id")
         if not ad_id:
             raise ValidationError("Missing 'ad_id' in payload")
-        
+
         date_preset = payload.get("date_preset", "last_7d")
         fields = payload.get("fields")
         breakdowns = payload.get("breakdowns")
-        
+        include_enhanced = payload.get("include_enhanced", True)  # Default to True
+
         # Validate date preset
         if not validate_date_preset(date_preset):
             raise ValidationError(f"Invalid date_preset: {date_preset}")
-        
+
         # Validate breakdowns if provided
         if breakdowns:
             for breakdown in breakdowns:
                 if not validate_breakdown(breakdown):
                     log_info(f"\n[WARNING] Unknown breakdown: {breakdown} (will attempt anyway)")
-        
+
         log_info(f"\n[INFO] Ad ID: {ad_id}")
         log_info(f"[INFO] Date preset: {date_preset}")
         if breakdowns:
             log_info(f"[INFO] Breakdowns: {', '.join(breakdowns)}")
-        
+
         response = await insights_agent.get_ad_insights(ad_id, date_preset, fields, breakdowns)
-        
-        log_info(f"\n✓ Ad insights retrieved successfully")
-        
-        return {
+
+        result = {
             "status": "success",
             "insights_type": "ad",
             "ad_id": ad_id,
             "data": response
         }
-    
+
+        # Add enhanced metrics if requested
+        if include_enhanced:
+            # Parse base insights data
+            insights_data = response.get("data", [{}])[0] if response.get("data") else {}
+            actions = insights_data.get("actions", [])
+            primary_result = insights_agent.extract_primary_result(actions)
+            spend = float(insights_data.get("spend", 0))
+            current_cpr = spend / primary_result["count"] if primary_result["count"] > 0 else 0
+
+            # Initialize enhanced metrics with base data
+            result["enhanced_metrics"] = {
+                "spend": {
+                    "total": spend,
+                    "daily_average": spend / 7 if spend > 0 else 0
+                },
+                "primary_conversion": {
+                    "type": primary_result["type"],
+                    "count": primary_result["count"]
+                },
+                "cost_per_result": {
+                    "current": round(current_cpr, 2),
+                    "rolling_7d": 0.0
+                },
+                "results_per_day": 0.0,
+                "frequency": float(insights_data.get("frequency", 0)),
+                "link_ctr": float(insights_data.get("inline_link_click_ctr", 0)),
+                "cpm": {
+                    "current": float(insights_data.get("cpm", 0)),
+                    "trend": "insufficient_data",
+                    "change_percent": 0.0
+                }
+            }
+
+            # Try to get daily insights for rolling calculations
+            try:
+                daily_insights = await insights_agent.get_daily_insights(ad_id, "ad", days=7)
+                rolling_cpr = insights_agent.calculate_rolling_cost_per_result(daily_insights)
+                results_per_day = insights_agent.calculate_results_per_day(daily_insights)
+                cpm_trend = insights_agent.calculate_cpm_trend(daily_insights)
+
+                result["enhanced_metrics"]["cost_per_result"]["rolling_7d"] = round(rolling_cpr, 2)
+                result["enhanced_metrics"]["results_per_day"] = round(results_per_day, 2)
+                result["enhanced_metrics"]["cpm"]["trend"] = cpm_trend.get("trend")
+                result["enhanced_metrics"]["cpm"]["change_percent"] = cpm_trend.get("change_percent", 0)
+            except Exception as e:
+                log_info(f"[WARNING] Could not fetch daily insights: {e}")
+
+            log_info(f"✓ Enhanced metrics included")
+
+        log_info(f"\n✓ Ad insights retrieved successfully")
+
+        return result
+
     except Exception as e:
         log_info(f"\n✗ Error: {e}")
         return {"status": "error", "message": str(e)}

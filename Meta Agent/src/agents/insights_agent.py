@@ -37,6 +37,17 @@ class InsightMetrics:
     campaign_name: Optional[str] = None
     adset_name: Optional[str] = None
     ad_name: Optional[str] = None
+    # New fields for enhanced insights
+    link_ctr: float = 0.0  # Link Click-Through Rate (fatigue signal)
+    inline_link_clicks: int = 0  # Link clicks for CTR calculation
+    learning_phase_status: Optional[str] = None  # Learning phase status
+    results_per_day: float = 0.0  # Daily results average
+    rolling_7d_cost_per_result: float = 0.0  # 7-day rolling cost per result
+    cpm_trend: Optional[str] = None  # CPM trend direction (increasing/decreasing/stable)
+    cpm_change_percent: float = 0.0  # CPM change percentage
+    daily_spend: float = 0.0  # Average daily spend
+    primary_result_type: Optional[str] = None  # Lead, Call, or WhatsApp
+    primary_result_count: int = 0  # Primary conversion count
 
     def __post_init__(self):
         if self.actions is None:
@@ -102,7 +113,9 @@ class InsightsAgent:
         if not fields:
             fields = [
                 "impressions", "clicks", "spend", "reach", "frequency",
-                "ctr", "cpc", "cpm", "actions", "action_values", "date_start", "date_stop"
+                "ctr", "cpc", "cpm", "actions", "action_values",
+                "inline_link_clicks", "inline_link_click_ctr",
+                "date_start", "date_stop"
             ]
 
         url = f"{self.api_url}/act_{account_id}/insights"
@@ -141,6 +154,7 @@ class InsightsAgent:
             fields = [
                 "impressions", "clicks", "spend", "reach", "frequency",
                 "ctr", "cpc", "cpm", "actions", "action_values",
+                "inline_link_clicks", "inline_link_click_ctr",
                 "campaign_id", "campaign_name", "date_start", "date_stop"
             ]
 
@@ -183,6 +197,7 @@ class InsightsAgent:
             fields = [
                 "impressions", "clicks", "spend", "reach", "frequency",
                 "ctr", "cpc", "cpm", "actions", "action_values",
+                "inline_link_clicks", "inline_link_click_ctr",
                 "adset_id", "adset_name", "date_start", "date_stop"
             ]
 
@@ -225,6 +240,7 @@ class InsightsAgent:
             fields = [
                 "impressions", "clicks", "spend", "reach", "frequency",
                 "ctr", "cpc", "cpm", "actions", "action_values",
+                "inline_link_clicks", "inline_link_click_ctr",
                 "ad_id", "adcreative", "date_start", "date_stop"
             ]
 
@@ -245,6 +261,245 @@ class InsightsAgent:
             log_debug(f"Error fetching ad insights: {e}")
             raise
 
+    async def get_adset_learning_phase(self, adset_id: str) -> Dict[str, Any]:
+        """
+        Fetch ad set learning phase status
+
+        Args:
+            adset_id: Ad set ID
+
+        Returns:
+            Learning phase status data including:
+            - learning_phase_info: Current learning phase status
+            - effective_status: Overall effective status
+        """
+        log_debug(f"\n[DEBUG] Fetching learning phase for ad set: {adset_id}")
+
+        url = f"{self.api_url}/{adset_id}"
+        params = {
+            "fields": "id,name,status,effective_status,learning_phase_info"
+        }
+
+        try:
+            response = await self._make_request("GET", url, params=params)
+            learning_info = response.get("learning_phase_info", {})
+
+            result = {
+                "adset_id": adset_id,
+                "adset_name": response.get("name"),
+                "status": response.get("status"),
+                "effective_status": response.get("effective_status"),
+                "learning_phase_status": learning_info.get("status", "UNKNOWN"),
+                "is_in_learning": learning_info.get("status") == "LEARNING",
+                "actions_remaining": learning_info.get("actions_remaining_to_exit", 0)
+            }
+
+            log_debug(f"Learning phase status: {result['learning_phase_status']}")
+            return result
+        except Exception as e:
+            log_debug(f"Error fetching learning phase: {e}")
+            raise
+
+    async def get_daily_insights(self, entity_id: str, entity_type: str = "campaign",
+                                  days: int = 7,
+                                  fields: Optional[List[str]] = None) -> List[Dict[str, Any]]:
+        """
+        Fetch daily insights for rolling calculations
+
+        Args:
+            entity_id: Campaign, Ad Set, or Ad ID
+            entity_type: Type of entity (campaign, adset, ad)
+            days: Number of days to fetch (default 7)
+            fields: Specific fields to retrieve
+
+        Returns:
+            List of daily insights data
+        """
+        log_debug(f"\n[DEBUG] Fetching daily insights for {entity_type}: {entity_id}")
+
+        if not fields:
+            fields = [
+                "impressions", "clicks", "spend", "reach", "frequency",
+                "ctr", "cpc", "cpm", "actions", "action_values",
+                "inline_link_clicks", "inline_link_click_ctr",
+                "date_start", "date_stop"
+            ]
+
+        url = f"{self.api_url}/{entity_id}/insights"
+        params = {
+            "date_preset": f"last_{days}d",
+            "time_increment": "1",  # Daily breakdown
+            "fields": ",".join(fields)
+        }
+
+        try:
+            response = await self._make_request("GET", url, params=params)
+            daily_data = response.get("data", [])
+            log_debug(f"Retrieved {len(daily_data)} days of insights")
+            return daily_data
+        except Exception as e:
+            log_debug(f"Error fetching daily insights: {e}")
+            raise
+
+    def calculate_rolling_cost_per_result(self, daily_insights: List[Dict[str, Any]],
+                                          result_action_types: List[str] = None) -> float:
+        """
+        Calculate 7-day rolling cost per result
+
+        Args:
+            daily_insights: List of daily insight data
+            result_action_types: Action types to count as results (leads, calls, etc.)
+
+        Returns:
+            Rolling cost per result value
+        """
+        if not result_action_types:
+            result_action_types = [
+                "lead", "onsite_conversion.lead_grouped",
+                "contact_call_click", "onsite_web_call",
+                "onsite_conversion.messaging_conversation_started_7d",
+                "onsite_conversion.messaging_first_reply"
+            ]
+
+        total_spend = 0.0
+        total_results = 0
+
+        for day_data in daily_insights:
+            total_spend += float(day_data.get("spend", 0))
+
+            actions = day_data.get("actions", [])
+            for action in actions:
+                if action.get("action_type") in result_action_types:
+                    total_results += int(action.get("value", 0))
+
+        if total_results > 0:
+            return total_spend / total_results
+        return 0.0
+
+    def calculate_results_per_day(self, daily_insights: List[Dict[str, Any]],
+                                  result_action_types: List[str] = None) -> float:
+        """
+        Calculate average results per day
+
+        Args:
+            daily_insights: List of daily insight data
+            result_action_types: Action types to count as results
+
+        Returns:
+            Average results per day
+        """
+        if not result_action_types:
+            result_action_types = [
+                "lead", "onsite_conversion.lead_grouped",
+                "contact_call_click", "onsite_web_call",
+                "onsite_conversion.messaging_conversation_started_7d",
+                "onsite_conversion.messaging_first_reply"
+            ]
+
+        total_results = 0
+        days_with_data = len(daily_insights)
+
+        for day_data in daily_insights:
+            actions = day_data.get("actions", [])
+            for action in actions:
+                if action.get("action_type") in result_action_types:
+                    total_results += int(action.get("value", 0))
+
+        if days_with_data > 0:
+            return total_results / days_with_data
+        return 0.0
+
+    def calculate_cpm_trend(self, daily_insights: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """
+        Calculate CPM trend over the period
+
+        Args:
+            daily_insights: List of daily insight data
+
+        Returns:
+            Dictionary with trend direction and percentage change
+        """
+        if len(daily_insights) < 2:
+            return {"trend": "insufficient_data", "change_percent": 0.0}
+
+        # Sort by date
+        sorted_data = sorted(daily_insights, key=lambda x: x.get("date_start", ""))
+
+        # Get CPM values
+        cpm_values = [float(d.get("cpm", 0)) for d in sorted_data if float(d.get("cpm", 0)) > 0]
+
+        if len(cpm_values) < 2:
+            return {"trend": "insufficient_data", "change_percent": 0.0}
+
+        # Calculate trend using first half vs second half comparison
+        mid_point = len(cpm_values) // 2
+        first_half_avg = sum(cpm_values[:mid_point]) / mid_point if mid_point > 0 else 0
+        second_half_avg = sum(cpm_values[mid_point:]) / (len(cpm_values) - mid_point) if (len(cpm_values) - mid_point) > 0 else 0
+
+        if first_half_avg > 0:
+            change_percent = ((second_half_avg - first_half_avg) / first_half_avg) * 100
+        else:
+            change_percent = 0.0
+
+        # Determine trend direction
+        if change_percent > 10:
+            trend = "increasing"
+        elif change_percent < -10:
+            trend = "decreasing"
+        else:
+            trend = "stable"
+
+        return {
+            "trend": trend,
+            "change_percent": round(change_percent, 2),
+            "first_period_avg": round(first_half_avg, 2),
+            "second_period_avg": round(second_half_avg, 2)
+        }
+
+    def extract_primary_result(self, actions: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """
+        Extract primary conversion result (Leads, Calls, or WhatsApp)
+
+        Args:
+            actions: List of action data
+
+        Returns:
+            Dictionary with result type and count
+        """
+        # Priority order for primary results
+        result_mappings = {
+            "lead": ("Lead", ["lead", "onsite_conversion.lead_grouped"]),
+            "call": ("Call", ["contact_call_click", "onsite_web_call", "phone_call"]),
+            "whatsapp": ("WhatsApp", [
+                "onsite_conversion.messaging_conversation_started_7d",
+                "onsite_conversion.messaging_first_reply",
+                "onsite_conversion.messaging_welcome_message_view"
+            ])
+        }
+
+        results = {"Lead": 0, "Call": 0, "WhatsApp": 0}
+
+        for action in actions:
+            action_type = action.get("action_type", "")
+            value = int(action.get("value", 0))
+
+            for result_name, action_types in result_mappings.values():
+                if action_type in action_types:
+                    results[result_name] += value
+
+        # Find primary result (highest count)
+        primary_type = max(results, key=results.get)
+        primary_count = results[primary_type]
+
+        if primary_count == 0:
+            return {"type": None, "count": 0, "all_results": results}
+
+        return {
+            "type": primary_type,
+            "count": primary_count,
+            "all_results": results
+        }
+
     def parse_insight_metrics(self, insight_data: Dict[str, Any]) -> InsightMetrics:
         """Parse raw insight data into InsightMetrics object"""
         metrics = InsightMetrics()
@@ -259,6 +514,10 @@ class InsightsAgent:
         metrics.cpm = float(insight_data.get("cpm", 0.0))
         metrics.cpp = float(insight_data.get("cpp", 0.0))
 
+        # Parse Link CTR (fatigue signal)
+        metrics.inline_link_clicks = int(insight_data.get("inline_link_clicks", 0))
+        metrics.link_ctr = float(insight_data.get("inline_link_click_ctr", 0.0))
+
         if "actions" in insight_data:
             metrics.actions = insight_data["actions"]
         if "action_values" in insight_data:
@@ -269,11 +528,32 @@ class InsightsAgent:
                 if action.get("action_type") == "offsite_conversion.post_click":
                     metrics.conversions = int(action.get("value", 0))
 
+            # Extract primary result (Lead, Call, or WhatsApp)
+            primary_result = self.extract_primary_result(metrics.actions)
+            metrics.primary_result_type = primary_result["type"]
+            metrics.primary_result_count = primary_result["count"]
+
+        # Parse learning phase status if available
+        if "learning_phase_info" in insight_data:
+            learning_info = insight_data["learning_phase_info"]
+            metrics.learning_phase_status = learning_info.get("status", "UNKNOWN")
+
         metrics.campaign_name = insight_data.get("campaign_name")
         metrics.adset_name = insight_data.get("adset_name")
         metrics.ad_name = insight_data.get("ad_name")
         metrics.date_start = insight_data.get("date_start", "")
         metrics.date_stop = insight_data.get("date_stop", "")
+
+        # Calculate daily spend if date range is available
+        if metrics.date_start and metrics.date_stop:
+            try:
+                start = datetime.strptime(metrics.date_start, "%Y-%m-%d")
+                stop = datetime.strptime(metrics.date_stop, "%Y-%m-%d")
+                days = (stop - start).days + 1
+                if days > 0:
+                    metrics.daily_spend = metrics.spend / days
+            except ValueError:
+                metrics.daily_spend = metrics.spend
 
         return metrics
 
@@ -299,7 +579,135 @@ class InsightsAgent:
         if metrics.conversions > 0:
             calculated["cost_per_result"] = metrics.spend / metrics.conversions
 
+        # Add new enhanced metrics
+        calculated["link_ctr"] = metrics.link_ctr
+        calculated["primary_result_type"] = metrics.primary_result_type
+        calculated["primary_result_count"] = metrics.primary_result_count
+        calculated["daily_spend"] = metrics.daily_spend
+        calculated["learning_phase_status"] = metrics.learning_phase_status
+
         return calculated
+
+    async def get_enhanced_insights(self, entity_id: str, entity_type: str = "campaign",
+                                    adset_id: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Fetch comprehensive enhanced insights including all new metrics
+
+        This method retrieves:
+        - Standard insights (spend, impressions, clicks, etc.)
+        - Link CTR (fatigue signal)
+        - Learning Phase Status (from adset)
+        - 7-day Rolling Cost per Result
+        - Results per Day
+        - CPM Trend
+        - Primary Conversion Count (Lead/Call/WhatsApp)
+        - Daily Spend
+
+        Args:
+            entity_id: Campaign, Ad Set, or Ad ID
+            entity_type: Type of entity (campaign, adset, ad)
+            adset_id: Optional adset ID for learning phase (if entity is ad or campaign)
+
+        Returns:
+            Enhanced insights dictionary with all metrics
+        """
+        log_debug(f"\n[DEBUG] Fetching enhanced insights for {entity_type}: {entity_id}")
+
+        # Fetch standard insights
+        if entity_type == "campaign":
+            standard_insights = await self.get_campaign_insights(entity_id)
+        elif entity_type == "adset":
+            standard_insights = await self.get_adset_insights(entity_id)
+            adset_id = entity_id  # Use the entity ID for learning phase
+        elif entity_type == "ad":
+            standard_insights = await self.get_ad_insights(entity_id)
+        else:
+            raise ValueError(f"Invalid entity type: {entity_type}")
+
+        insights_data = standard_insights.get("data", [{}])[0] if standard_insights.get("data") else {}
+
+        # Fetch daily insights for rolling calculations
+        daily_insights = await self.get_daily_insights(entity_id, entity_type, days=7)
+
+        # Calculate rolling metrics
+        rolling_cost_per_result = self.calculate_rolling_cost_per_result(daily_insights)
+        results_per_day = self.calculate_results_per_day(daily_insights)
+        cpm_trend = self.calculate_cpm_trend(daily_insights)
+
+        # Fetch learning phase status if adset_id is provided
+        learning_phase = None
+        if adset_id:
+            try:
+                learning_phase = await self.get_adset_learning_phase(adset_id)
+            except Exception as e:
+                log_debug(f"Could not fetch learning phase: {e}")
+                learning_phase = {"learning_phase_status": "UNKNOWN", "is_in_learning": False}
+
+        # Parse standard metrics
+        metrics = self.parse_insight_metrics(insights_data)
+
+        # Add rolling and trend metrics
+        metrics.rolling_7d_cost_per_result = rolling_cost_per_result
+        metrics.results_per_day = results_per_day
+        metrics.cpm_trend = cpm_trend.get("trend")
+        metrics.cpm_change_percent = cpm_trend.get("change_percent", 0.0)
+
+        # Add learning phase if available
+        if learning_phase:
+            metrics.learning_phase_status = learning_phase.get("learning_phase_status", "UNKNOWN")
+
+        # Build enhanced response
+        enhanced_insights = {
+            "entity_id": entity_id,
+            "entity_type": entity_type,
+            "date_range": {
+                "start": metrics.date_start,
+                "end": metrics.date_stop
+            },
+            # Budget & Spend
+            "spend": {
+                "total": metrics.spend,
+                "daily_average": metrics.daily_spend
+            },
+            # Primary Conversion
+            "primary_conversion": {
+                "type": metrics.primary_result_type,
+                "count": metrics.primary_result_count
+            },
+            # Cost Metrics
+            "cost_per_result": {
+                "current": metrics.spend / metrics.primary_result_count if metrics.primary_result_count > 0 else 0,
+                "rolling_7d": metrics.rolling_7d_cost_per_result
+            },
+            # Performance Stability
+            "results_per_day": metrics.results_per_day,
+            # Learning Phase
+            "learning_phase": {
+                "status": metrics.learning_phase_status,
+                "is_in_learning": learning_phase.get("is_in_learning", False) if learning_phase else False,
+                "actions_remaining": learning_phase.get("actions_remaining", 0) if learning_phase else 0
+            },
+            # Fatigue Signals
+            "frequency": metrics.frequency,
+            "link_ctr": metrics.link_ctr,
+            # Audience/Competition Signals
+            "cpm": {
+                "current": metrics.cpm,
+                "trend": metrics.cpm_trend,
+                "change_percent": metrics.cpm_change_percent
+            },
+            # Additional Standard Metrics
+            "impressions": metrics.impressions,
+            "clicks": metrics.clicks,
+            "reach": metrics.reach,
+            "ctr": metrics.ctr,
+            "cpc": metrics.cpc,
+            # Raw metrics object for further processing
+            "raw_metrics": asdict(metrics)
+        }
+
+        log_debug(f"Enhanced insights generated successfully")
+        return enhanced_insights
 
     def generate_performance_report(self, insights_list: List[Dict[str, Any]],
                                    metric_name: str = "Campaign") -> Dict[str, Any]:

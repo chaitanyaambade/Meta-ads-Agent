@@ -302,7 +302,7 @@ Date Preset Options: last_7d, last_14d, last_28d, last_30d, last_90d, today,
                      last_3m, lifetime
 
 ================================================================================
- GET CAMPAIGN INSIGHTS
+ GET CAMPAIGN INSIGHTS (includes enhanced_metrics by default)
 ================================================================================
 
 {
@@ -314,11 +314,23 @@ Date Preset Options: last_7d, last_14d, last_28d, last_30d, last_90d, today,
   "fields": ["impressions", "clicks", "spend", "reach", "actions", "ctr", "cpc"]
 }
 
-Breakdown Options: age, gender, country, region, city, device, placement, platform, 
+Response includes enhanced_metrics: spend, primary_conversion, cost_per_result
+(current & 7d rolling), results_per_day, frequency, link_ctr, cpm trend
+
+To disable enhanced metrics:
+{
+  "ad_account_id": "120244256006770196",
+  "action": "get_campaign_insights",
+  "campaign_id": "120244256006770196",
+  "date_preset": "last_7d",
+  "include_enhanced": false
+}
+
+Breakdown Options: age, gender, country, region, city, device, placement, platform,
                    audience_id, conversion_device, conversion_destination, frequency_value
 
 ================================================================================
- GET AD SET INSIGHTS
+ GET AD SET INSIGHTS (includes enhanced_metrics + learning_phase by default)
 ================================================================================
 
 {
@@ -330,8 +342,13 @@ Breakdown Options: age, gender, country, region, city, device, placement, platfo
   "fields": ["impressions", "clicks", "spend", "reach", "ctr", "cpc", "cpm"]
 }
 
+Response includes all campaign-level enhanced_metrics PLUS:
+- learning_phase.status: LEARNING / LEARNING_COMPLETE / LEARNING_LIMITED
+- learning_phase.is_in_learning: Boolean flag
+- learning_phase.actions_remaining: Conversions needed to exit learning
+
 ================================================================================
- GET AD INSIGHTS
+ GET AD INSIGHTS (includes enhanced_metrics by default)
 ================================================================================
 
 {
@@ -341,6 +358,8 @@ Breakdown Options: age, gender, country, region, city, device, placement, platfo
   "date_preset": "last_7d",
   "fields": ["impressions", "clicks", "spend", "reach", "frequency", "ctr", "cpc"]
 }
+
+Response includes enhanced_metrics (same as campaign-level)
 
 ================================================================================
  GET PERFORMANCE REPORT
@@ -455,6 +474,27 @@ DATE PRESETS - ALL OPTIONS:
 - this_quarter: Current quarter
 - last_3m: Last 3 months
 - lifetime: All time data
+
+================================================================================
+ ENHANCED METRICS (INCLUDED BY DEFAULT)
+================================================================================
+
+Campaign, Ad Set, and Ad insights now include enhanced_metrics automatically:
+
+- spend.total / spend.daily_average: Budget tracking
+- primary_conversion.type / count: Lead, Call, or WhatsApp
+- cost_per_result.current / rolling_7d: CPL with 7-day rolling average
+- results_per_day: Performance stability
+- frequency: Creative fatigue signal
+- link_ctr: Fatigue signal
+- cpm.current / cpm.trend / cpm.change_percent: Saturation signal
+
+Ad Set insights ALSO include learning_phase:
+- learning_phase.status: LEARNING / LEARNING_COMPLETE / LEARNING_LIMITED
+- learning_phase.is_in_learning: Boolean flag
+- learning_phase.actions_remaining: Conversions needed to exit learning
+
+To disable enhanced metrics, add: "include_enhanced": false
 
 ================================================================================
  COMPLETE WORKFLOW EXAMPLE

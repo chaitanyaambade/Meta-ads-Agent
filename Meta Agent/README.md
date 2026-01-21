@@ -152,11 +152,13 @@ python3 main.py --verbose create_campaign.json
 | Action | Purpose | Required Fields |
 |--------|---------|-----------------|
 | `get_account_insights` | Fetch account-level performance metrics | date_preset |
-| `get_campaign_insights` | Fetch campaign-level performance metrics | campaign_id, date_preset |
-| `get_adset_insights` | Fetch ad set-level performance metrics | adset_id, date_preset |
-| `get_ad_insights` | Fetch ad-level performance metrics | ad_id, date_preset |
+| `get_campaign_insights` | Campaign metrics + enhanced (7d rolling, CPM trend) | campaign_id, date_preset |
+| `get_adset_insights` | Ad set metrics + learning phase status | adset_id, date_preset |
+| `get_ad_insights` | Ad metrics + enhanced | ad_id, date_preset |
 | `get_performance_report` | Generate comprehensive performance report | report_type, date_preset |
 | `export_insights` | Export insights to JSON or CSV | insights_type, format, date_preset |
+
+**Note:** Campaign, Ad Set, and Ad insights now include **enhanced metrics by default** (spend, primary conversion, 7-day rolling cost per result, results per day, frequency, link CTR, CPM trend). Ad Set insights also include **learning phase status**.
 
 ### Lead Form Operations (5)
 | Action | Purpose | Required Fields |
@@ -422,7 +424,7 @@ Retrieve account-level performance metrics:
 ```
 
 ### Get Campaign Insights
-Retrieve campaign-level performance metrics with optional breakdowns:
+Retrieve campaign-level performance metrics with **enhanced metrics included by default**:
 ```json
 {
   "ad_account_id": "120244256006770196",
@@ -434,8 +436,17 @@ Retrieve campaign-level performance metrics with optional breakdowns:
 }
 ```
 
+**Response includes `enhanced_metrics` object with:**
+- `spend.total` / `spend.daily_average`
+- `primary_conversion.type` (Lead/Call/WhatsApp) / `primary_conversion.count`
+- `cost_per_result.current` / `cost_per_result.rolling_7d`
+- `results_per_day`, `frequency`, `link_ctr`
+- `cpm.current` / `cpm.trend` / `cpm.change_percent`
+
+To disable: add `"include_enhanced": false`
+
 ### Get Ad Set Insights
-Retrieve ad set-level performance metrics:
+Retrieve ad set-level performance metrics with **enhanced metrics + learning phase status**:
 ```json
 {
   "ad_account_id": "120244256006770196",
@@ -445,6 +456,11 @@ Retrieve ad set-level performance metrics:
   "breakdowns": ["device", "placement"]
 }
 ```
+
+**Response includes all campaign-level enhanced_metrics PLUS:**
+- `learning_phase.status` (LEARNING / LEARNING_COMPLETE / LEARNING_LIMITED)
+- `learning_phase.is_in_learning` (boolean)
+- `learning_phase.actions_remaining` (conversions needed to exit)
 
 ### Get Ad Insights
 Retrieve ad-level performance metrics:
