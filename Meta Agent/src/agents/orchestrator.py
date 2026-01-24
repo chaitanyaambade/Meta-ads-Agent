@@ -12,7 +12,7 @@ from ..core.utils import log_debug
 from .campaign_agent import CampaignAgent
 from .asset_agent import AssetAgent
 from .ad_agent import AdCreationAgent
-from .lead_form_agent import LeadFormAgent
+from .business_agent import BusinessAgent
 
 
 class OrchestratorAgent:
@@ -26,8 +26,8 @@ class OrchestratorAgent:
         self.campaign_agent = CampaignAgent(self.api)
         self.asset_agent = AssetAgent(self.api)
         self.ad_agent = AdCreationAgent(self.api)
-        self.lead_form_agent = LeadFormAgent(self.api)
-        log_debug("[Orchestrator] Initialized with Campaign Agent, Asset Agent, Ad Agent, and Lead Form Agent")
+        self.business_agent = BusinessAgent(self.api)
+        log_debug("[Orchestrator] Initialized with Campaign Agent, Asset Agent, Ad Agent, and Business Agent")
 
     @property
     def access_token(self) -> str:

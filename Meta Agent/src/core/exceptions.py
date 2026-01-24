@@ -55,3 +55,8 @@ class AdCreationError(AdAgentError):
 class LeadFormError(MetaAgentError):
     """Lead form creation/retrieval failed"""
     pass
+
+
+class PixelError(MetaAgentError):
+    """Pixel creation/retrieval failed"""
+    pass

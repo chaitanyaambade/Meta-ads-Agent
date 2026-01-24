@@ -79,7 +79,21 @@ class CampaignParams:
 
 
 class AdSetParams:
-    """Flexible Ad set creation parameters - accepts any fields from JSON"""
+    """Flexible Ad set creation parameters - accepts any fields from JSON
+
+    Supports Value Optimization for Lead Campaigns:
+        - optimization_goal: "VALUE" - Optimize for conversion value
+        - bid_strategy: "LOWEST_COST_WITH_MIN_ROAS" - ROAS-based bidding
+        - roas_average_floor: Minimum ROAS target (e.g., 1.5 for 150% return)
+        - bid_constraints: {"roas_average_floor": value} - Alternative ROAS setting
+
+    Value Set Parameters (for lead value ranges):
+        - promoted_object.custom_conversion_id: Custom conversion for value tracking
+        - value_optimization_goal: Set to "VALUE" for value-based optimization
+        - is_value_optimization: Boolean flag for value optimization
+        - min_conversion_value: Minimum expected conversion value
+        - max_conversion_value: Maximum expected conversion value
+    """
 
     def __init__(self, **kwargs):
         # Require minimal identifying fields
@@ -108,6 +122,9 @@ class AdSetParams:
             except ValueError:
                 raise ValidationError("Ad set 'lifetime_budget' must be an integer amount in paisa")
 
+        # Validate Value Set parameters if present
+        self._validate_value_optimization()
+
     @property
     def name(self) -> str:
         return self.params.get("name")
@@ -127,6 +144,48 @@ class AdSetParams:
     @property
     def status(self) -> str:
         return self.params.get("status", "PAUSED")
+
+    def _validate_value_optimization(self):
+        """Validate Value Set / Value Optimization parameters"""
+        # Check min/max conversion value constraints
+        min_val = self.params.get("min_conversion_value")
+        max_val = self.params.get("max_conversion_value")
+
+        if min_val is not None and max_val is not None:
+            try:
+                min_val = float(min_val)
+                max_val = float(max_val)
+                if min_val < 0:
+                    raise ValidationError("'min_conversion_value' must be a positive number")
+                if max_val < 0:
+                    raise ValidationError("'max_conversion_value' must be a positive number")
+                if min_val > max_val:
+                    raise ValidationError("'min_conversion_value' cannot be greater than 'max_conversion_value'")
+            except (ValueError, TypeError):
+                raise ValidationError("'min_conversion_value' and 'max_conversion_value' must be numeric")
+
+        # Validate ROAS floor if present
+        roas_floor = self.params.get("roas_average_floor")
+        if roas_floor is not None:
+            try:
+                roas_floor = float(roas_floor)
+                if roas_floor <= 0:
+                    raise ValidationError("'roas_average_floor' must be a positive number")
+            except (ValueError, TypeError):
+                raise ValidationError("'roas_average_floor' must be a numeric value")
+
+        # Validate bid_constraints if present
+        bid_constraints = self.params.get("bid_constraints")
+        if bid_constraints is not None:
+            if not isinstance(bid_constraints, dict):
+                raise ValidationError("'bid_constraints' must be an object/dictionary")
+            if "roas_average_floor" in bid_constraints:
+                try:
+                    floor = float(bid_constraints["roas_average_floor"])
+                    if floor <= 0:
+                        raise ValidationError("'bid_constraints.roas_average_floor' must be positive")
+                except (ValueError, TypeError):
+                    raise ValidationError("'bid_constraints.roas_average_floor' must be numeric")
 
     def to_api_dict(self) -> Dict:
         """Return a copy of all provided fields to send to the API"""
@@ -283,3 +342,12 @@ class Lead:
     ad_name: Optional[str] = None
     adset_id: Optional[str] = None
     campaign_id: Optional[str] = None
+
+
+@dataclass
+class Pixel:
+    """Meta Pixel response model"""
+    id: str
+    name: str
+    ad_account_id: Optional[str] = None
+    created_time: Optional[str] = None

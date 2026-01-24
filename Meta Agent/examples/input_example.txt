@@ -112,6 +112,108 @@ Optional: limit parameter (default: 50)
 }
 
 ================================================================================
+ CREATE ADSET WITH VALUE SET (Min/Max Lead Value)
+================================================================================
+
+Use Value Set to tell Meta the expected value range of your leads.
+This helps Meta bid more accurately based on lead quality.
+
+Example: Lead value range ₹100 - ₹500:
+{
+  "ad_account_id": "120244256006770196",
+  "action": "create_adset",
+  "adset": {
+    "name": "High Value Leads Ad Set",
+    "campaign_id": "120244256006770196",
+    "optimization_goal": "LEAD_GENERATION",
+    "billing_event": "IMPRESSIONS",
+    "bid_strategy": "LOWEST_COST_WITHOUT_CAP",
+    "status": "PAUSED",
+    "daily_budget": 50000,
+    "min_conversion_value": 100,
+    "max_conversion_value": 500,
+    "promoted_object": {
+      "page_id": "864501833422699"
+    },
+    "targeting": {
+      "geo_locations": {
+        "countries": ["IN"]
+      },
+      "age_min": 25,
+      "age_max": 55
+    }
+  }
+}
+
+================================================================================
+ CREATE ADSET WITH VALUE OPTIMIZATION (ROAS Target)
+================================================================================
+
+For advanced value optimization with ROAS (Return on Ad Spend) target:
+
+{
+  "ad_account_id": "120244256006770196",
+  "action": "create_adset",
+  "adset": {
+    "name": "ROAS Optimized Leads",
+    "campaign_id": "120244256006770196",
+    "optimization_goal": "VALUE",
+    "billing_event": "IMPRESSIONS",
+    "bid_strategy": "LOWEST_COST_WITH_MIN_ROAS",
+    "roas_average_floor": 1.5,
+    "status": "PAUSED",
+    "daily_budget": 100000,
+    "promoted_object": {
+      "page_id": "864501833422699",
+      "pixel_id": "YOUR_PIXEL_ID",
+      "custom_event_type": "LEAD"
+    },
+    "targeting": {
+      "geo_locations": {
+        "countries": ["IN"]
+      },
+      "age_min": 25,
+      "age_max": 55
+    }
+  }
+}
+
+Alternative using bid_constraints:
+{
+  "ad_account_id": "120244256006770196",
+  "action": "create_adset",
+  "adset": {
+    "name": "Value Optimized Leads - Bid Constraints",
+    "campaign_id": "120244256006770196",
+    "optimization_goal": "VALUE",
+    "billing_event": "IMPRESSIONS",
+    "bid_constraints": {
+      "roas_average_floor": 2.0
+    },
+    "status": "PAUSED",
+    "daily_budget": 100000,
+    "promoted_object": {
+      "page_id": "864501833422699"
+    },
+    "targeting": {
+      "geo_locations": {
+        "countries": ["IN"]
+      },
+      "age_min": 25,
+      "age_max": 55
+    }
+  }
+}
+
+Value Set Parameters Reference:
+- min_conversion_value: Minimum expected lead value (e.g., 100 for ₹100)
+- max_conversion_value: Maximum expected lead value (e.g., 500 for ₹500)
+- optimization_goal: "VALUE" for value-based optimization
+- bid_strategy: "LOWEST_COST_WITH_MIN_ROAS" for ROAS bidding
+- roas_average_floor: Minimum ROAS target (1.5 = 150% return)
+- bid_constraints.roas_average_floor: Alternative ROAS setting
+
+================================================================================
  UPDATE CAMPAIGN
 ================================================================================
 
@@ -829,3 +931,116 @@ Step 6: Retrieve Leads (after campaign runs)
   "action": "get_leads",
   "form_id": "YOUR_FORM_ID"
 }
+
+================================================================================
+ PIXEL OPERATIONS
+================================================================================
+
+Meta Pixels are used to track conversions and website events for optimization.
+Pixels are created at the Ad Account level.
+
+================================================================================
+ CREATE PIXEL
+================================================================================
+
+{
+  "ad_account_id": "120244256006770196",
+  "action": "create_pixel",
+  "name": "Axgen Web Pixel"
+}
+
+Response:
+{
+  "status": "success",
+  "pixel_id": "123456789012345",
+  "name": "Axgen Web Pixel",
+  "ad_account_id": "120244256006770196"
+}
+
+The pixel_id returned is your Pixel ID for tracking setup.
+
+================================================================================
+ GET PIXEL
+================================================================================
+
+{
+  "ad_account_id": "120244256006770196",
+  "action": "get_pixel",
+  "pixel_id": "123456789012345"
+}
+
+================================================================================
+ LIST PIXELS
+================================================================================
+
+List all pixels for the ad account:
+{
+  "ad_account_id": "120244256006770196",
+  "action": "list_pixels"
+}
+
+With optional limit:
+{
+  "ad_account_id": "120244256006770196",
+  "action": "list_pixels",
+  "limit": 25
+}
+
+================================================================================
+ UPDATE/RENAME PIXEL
+================================================================================
+
+{
+  "ad_account_id": "120244256006770196",
+  "action": "update_pixel",
+  "pixel_id": "123456789012345",
+  "name": "Axgen Web Pixel - Renamed"
+}
+
+Response:
+{
+  "status": "success",
+  "pixel_id": "123456789012345",
+  "name": "Axgen Web Pixel - Renamed",
+  "message": "Pixel renamed successfully"
+}
+
+================================================================================
+ USING PIXEL IN AD SET (Value Optimization)
+================================================================================
+
+After creating a pixel, use it in an ad set for conversion tracking:
+{
+  "ad_account_id": "120244256006770196",
+  "action": "create_adset",
+  "adset": {
+    "name": "Pixel Optimized Ad Set",
+    "campaign_id": "120244256006770196",
+    "optimization_goal": "OFFSITE_CONVERSIONS",
+    "billing_event": "IMPRESSIONS",
+    "status": "PAUSED",
+    "daily_budget": 50000,
+    "promoted_object": {
+      "pixel_id": "YOUR_PIXEL_ID",
+      "custom_event_type": "LEAD"
+    },
+    "targeting": {
+      "geo_locations": {
+        "countries": ["IN"]
+      },
+      "age_min": 25,
+      "age_max": 55
+    }
+  }
+}
+
+Custom Event Types for promoted_object:
+- LEAD: Lead generation events
+- PURCHASE: Purchase/sale events
+- ADD_TO_CART: Add to cart events
+- COMPLETE_REGISTRATION: Registration events
+- CONTACT: Contact form submissions
+- VIEW_CONTENT: Page/content views
+- SEARCH: Search events
+- ADD_PAYMENT_INFO: Payment info added
+- INITIATE_CHECKOUT: Checkout started

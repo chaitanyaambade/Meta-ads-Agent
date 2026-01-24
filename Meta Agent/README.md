@@ -11,6 +11,7 @@ Meta Ads Agent provides a modular, asynchronous architecture for managing:
 - **Creatives** — Create ad creatives with flexible specifications
 - **Ads** — Create, update, and manage ads linked to creatives
 - **Lead Forms** — Create lead forms, retrieve leads for lead generation campaigns
+- **Pixels** — Create, manage, and track Meta Pixels for conversion tracking
 - **Insights** — Fetch, analyze, and export performance data
 
 ---
@@ -44,7 +45,7 @@ Meta Agent/
 │   │   ├── campaign_agent.py    # Campaign & ad set management
 │   │   ├── asset_agent.py       # Image/video upload & caching
 │   │   ├── ad_agent.py          # Ad creative & ad management
-│   │   ├── lead_form_agent.py   # Lead form & leads management
+│   │   ├── business_agent.py    # Lead forms, pixels & business operations
 │   │   └── insights_agent.py    # Performance data & analytics
 │   │
 │   └── handlers/                # Action handlers
@@ -63,7 +64,7 @@ OrchestratorAgent (Main Coordinator)
 ├── CampaignAgent        → Campaign & ad set CRUD
 ├── AssetAgent           → Image & video upload/retrieval/cache
 ├── AdCreationAgent      → Ad creative & ad management
-├── LeadFormAgent        → Lead form creation & leads retrieval
+├── BusinessAgent        → Lead forms, pixels & business operations
 └── InsightsAgent        → Performance data & analytics
 
 MetaAPIClient (Async HTTP wrapper for Meta Graph API)
@@ -106,7 +107,7 @@ python3 main.py --verbose create_campaign.json
 
 ---
 
-## 📋 Supported Operations (31 Total)
+## 📋 Supported Operations (35 Total)
 
 ### Account Operations (1)
 | Action | Purpose | Returns |
@@ -170,6 +171,16 @@ python3 main.py --verbose create_campaign.json
 | `get_lead` | Get single lead details | lead_id |
 
 **Note:** Lead forms are created on Facebook **Pages**, not Ad Accounts. You must provide a `page_id`.
+
+### Pixel Operations (4)
+| Action | Purpose | Required Fields |
+|--------|---------|-----------------|
+| `create_pixel` | Create a Meta Pixel for an ad account | name |
+| `get_pixel` | Get pixel details | pixel_id |
+| `list_pixels` | List all pixels for an ad account | (none) |
+| `update_pixel` | Update/rename a pixel | pixel_id, name |
+
+**Note:** Meta Pixels are used for conversion tracking and event optimization.
 
 ---
 
@@ -676,6 +687,67 @@ After creating a lead form, use it in a creative:
 
 ---
 
+## 📍 Pixel Operations
+
+Meta Pixels are used for conversion tracking, audience building, and optimization. They help you measure the effectiveness of your advertising by understanding actions people take on your website.
+
+### Create Pixel
+Create a new Meta Pixel for an ad account:
+```json
+{
+  "ad_account_id": "120244256006770196",
+  "action": "create_pixel",
+  "name": "My Website Pixel"
+}
+```
+
+### Get Pixel Details
+```json
+{
+  "ad_account_id": "120244256006770196",
+  "action": "get_pixel",
+  "pixel_id": "1234567890123456"
+}
+```
+
+### List All Pixels
+List all pixels for an ad account:
+```json
+{
+  "ad_account_id": "120244256006770196",
+  "action": "list_pixels"
+}
+```
+
+With optional limit parameter:
+```json
+{
+  "ad_account_id": "120244256006770196",
+  "action": "list_pixels",
+  "limit": 50
+}
+```
+
+### Update/Rename Pixel
+```json
+{
+  "ad_account_id": "120244256006770196",
+  "action": "update_pixel",
+  "pixel_id": "1234567890123456",
+  "name": "New Pixel Name"
+}
+```
+
+### Pixel Response Fields
+| Field | Description |
+|-------|-------------|
+| `id` | Unique pixel identifier |
+| `name` | Pixel name |
+| `creation_time` | When the pixel was created |
+| `last_fired_time` | Last time the pixel received an event |
+
+---
+
 ## 📊 Asset Specifications
 
 ### Images
@@ -811,7 +883,8 @@ python3 main.py clear_asset_cache.json
 - Ad creative creation (flexible fields)
 - **Lead form creation & management**
 - **Leads retrieval from forms**
-- **List operations** (ad accounts, campaigns, ad sets, ads, lead forms)
+- **Meta Pixel creation & management**
+- **List operations** (ad accounts, campaigns, ad sets, ads, lead forms, pixels)
 - **Performance insights** (account, campaign, ad set, ad levels)
 - **Performance reporting** (comprehensive analytics)
 - **Insights export** (JSON and CSV formats)

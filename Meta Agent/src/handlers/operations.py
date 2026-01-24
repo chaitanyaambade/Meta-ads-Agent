@@ -1168,7 +1168,7 @@ async def handle_create_lead_form(orchestrator: OrchestratorAgent, ad_account_id
         log_info(f"[INFO] Questions count: {len(lead_form_json.get('questions', []))}")
 
         lead_form_params = create_lead_form_params_from_json(lead_form_json)
-        lead_form = await orchestrator.lead_form_agent.create_lead_form(page_id, lead_form_params)
+        lead_form = await orchestrator.business_agent.create_lead_form(page_id, lead_form_params)
 
         log_info(f"\n✓ Lead form created successfully")
         log_info(f"✓ Form ID: {lead_form.id}")
@@ -1197,7 +1197,7 @@ async def handle_get_lead_form(orchestrator: OrchestratorAgent, ad_account_id: s
 
         log_info(f"\n[INFO] Fetching lead form: {form_id}")
 
-        form_data = await orchestrator.lead_form_agent.get_lead_form(form_id)
+        form_data = await orchestrator.business_agent.get_lead_form(form_id)
 
         log_info(f"\n✓ Lead form retrieved:")
         log_info(f"  ID: {form_data.get('id')}")
@@ -1225,7 +1225,7 @@ async def handle_list_lead_forms(orchestrator: OrchestratorAgent, ad_account_id:
 
         log_info(f"\n[INFO] Page ID: {page_id}")
 
-        forms = await orchestrator.lead_form_agent.list_lead_forms(page_id, limit)
+        forms = await orchestrator.business_agent.list_lead_forms(page_id, limit)
 
         if not forms:
             log_info(f"\n[INFO] No lead forms found for page {page_id}")
@@ -1265,7 +1265,7 @@ async def handle_get_leads(orchestrator: OrchestratorAgent, ad_account_id: str, 
         log_info(f"\n[INFO] Form ID: {form_id}")
         log_info(f"[INFO] Limit: {limit}")
 
-        leads = await orchestrator.lead_form_agent.get_leads(form_id, limit)
+        leads = await orchestrator.business_agent.get_leads(form_id, limit)
 
         if not leads:
             log_info(f"\n[INFO] No leads found for form {form_id}")
@@ -1308,7 +1308,7 @@ async def handle_get_lead(orchestrator: OrchestratorAgent, ad_account_id: str, p
 
         log_info(f"\n[INFO] Fetching lead: {lead_id}")
 
-        lead_data = await orchestrator.lead_form_agent.get_lead(lead_id)
+        lead_data = await orchestrator.business_agent.get_lead(lead_id)
 
         # Parse field_data into a more usable format
         field_data = {}
@@ -1332,6 +1332,131 @@ async def handle_get_lead(orchestrator: OrchestratorAgent, ad_account_id: str, p
         log_info(f"\n✓ Lead retrieved: {lead_id}")
 
         return {"status": "success", "lead": result}
+
+    except Exception as e:
+        log_info(f"\n✗ Error: {e}")
+        return {"status": "error", "message": str(e)}
+
+
+# ============================================================================
+# PIXEL OPERATIONS
+# ============================================================================
+
+async def handle_create_pixel(orchestrator: OrchestratorAgent, ad_account_id: str, payload: dict) -> dict:
+    """Create a Meta Pixel for an ad account"""
+    log_section("CREATE PIXEL")
+
+    try:
+        name = payload.get("name")
+        if not name:
+            raise ValidationError("Missing 'name' in payload")
+
+        log_info(f"\n[INFO] Ad Account ID: {ad_account_id}")
+        log_info(f"[INFO] Pixel name: {name}")
+
+        pixel = await orchestrator.business_agent.create_pixel(ad_account_id, name)
+
+        log_info(f"\n✓ Pixel created successfully")
+        log_info(f"✓ Pixel ID: {pixel.id}")
+        log_info(f"✓ Pixel Name: {pixel.name}")
+
+        return {
+            "status": "success",
+            "pixel_id": pixel.id,
+            "name": pixel.name,
+            "ad_account_id": ad_account_id
+        }
+
+    except Exception as e:
+        log_info(f"\n✗ Error: {e}")
+        return {"status": "error", "message": str(e)}
+
+
+async def handle_get_pixel(orchestrator: OrchestratorAgent, ad_account_id: str, payload: dict) -> dict:
+    """Get pixel details"""
+    log_section("GET PIXEL")
+
+    try:
+        pixel_id = payload.get("pixel_id")
+        if not pixel_id:
+            raise ValidationError("Missing 'pixel_id' in payload")
+
+        log_info(f"\n[INFO] Fetching pixel: {pixel_id}")
+
+        pixel_data = await orchestrator.business_agent.get_pixel(pixel_id)
+
+        log_info(f"\n✓ Pixel retrieved:")
+        log_info(f"  ID: {pixel_data.get('id')}")
+        log_info(f"  Name: {pixel_data.get('name')}")
+
+        return {"status": "success", "pixel": pixel_data}
+
+    except Exception as e:
+        log_info(f"\n✗ Error: {e}")
+        return {"status": "error", "message": str(e)}
+
+
+async def handle_list_pixels(orchestrator: OrchestratorAgent, ad_account_id: str, payload: dict) -> dict:
+    """List all pixels for an ad account"""
+    log_section("LIST PIXELS")
+
+    try:
+        limit = payload.get("limit", 50)
+
+        log_info(f"\n[INFO] Ad Account ID: {ad_account_id}")
+
+        pixels = await orchestrator.business_agent.list_pixels(ad_account_id, limit)
+
+        if not pixels:
+            log_info(f"\n[INFO] No pixels found for ad account {ad_account_id}")
+            return {"status": "success", "pixels": [], "count": 0}
+
+        pixel_list = []
+        for pixel in pixels:
+            pixel_list.append({
+                "id": pixel.get("id"),
+                "name": pixel.get("name"),
+                "creation_time": pixel.get("creation_time"),
+                "last_fired_time": pixel.get("last_fired_time")
+            })
+
+        log_info(f"\n✓ Found {len(pixels)} pixel(s)")
+
+        return {"status": "success", "pixels": pixel_list, "count": len(pixels)}
+
+    except Exception as e:
+        log_info(f"\n✗ Error: {e}")
+        return {"status": "error", "message": str(e)}
+
+
+async def handle_update_pixel(orchestrator: OrchestratorAgent, ad_account_id: str, payload: dict) -> dict:
+    """Update/rename a Meta Pixel"""
+    log_section("UPDATE PIXEL")
+
+    try:
+        pixel_id = payload.get("pixel_id")
+        name = payload.get("name")
+
+        if not pixel_id:
+            raise ValidationError("Missing 'pixel_id' in payload")
+        if not name:
+            raise ValidationError("Missing 'name' in payload")
+
+        log_info(f"\n[INFO] Pixel ID: {pixel_id}")
+        log_info(f"[INFO] New name: {name}")
+
+        updated_pixel = await orchestrator.business_agent.update_pixel(pixel_id, name)
+
+        log_info(f"\n✓ Pixel updated successfully")
+        log_info(f"✓ Pixel ID: {updated_pixel.get('id')}")
+        log_info(f"✓ New Name: {updated_pixel.get('name')}")
+
+        return {
+            "status": "success",
+            "pixel_id": updated_pixel.get("id"),
+            "name": updated_pixel.get("name"),
+            "message": "Pixel renamed successfully"
+        }
 
     except Exception as e:
         log_info(f"\n✗ Error: {e}")
@@ -1405,6 +1530,15 @@ async def process_action(orchestrator: OrchestratorAgent, ad_account_id: str, ac
         return await handle_get_leads(orchestrator, ad_account_id, action_payload)
     elif action == "get_lead":
         return await handle_get_lead(orchestrator, ad_account_id, action_payload)
+    # Pixel Operations
+    elif action == "create_pixel":
+        return await handle_create_pixel(orchestrator, ad_account_id, action_payload)
+    elif action == "get_pixel":
+        return await handle_get_pixel(orchestrator, ad_account_id, action_payload)
+    elif action == "list_pixels":
+        return await handle_list_pixels(orchestrator, ad_account_id, action_payload)
+    elif action == "update_pixel":
+        return await handle_update_pixel(orchestrator, ad_account_id, action_payload)
     else:
         supported_actions = [
             "list_ad_accounts",
@@ -1414,7 +1548,8 @@ async def process_action(orchestrator: OrchestratorAgent, ad_account_id: str, ac
             "create_creative", "get_creative", "create_ad", "update_ad", "get_ad", "list_ads",
             "get_account_insights", "get_campaign_insights", "get_adset_insights",
             "get_ad_insights", "get_performance_report", "export_insights",
-            "create_lead_form", "get_lead_form", "list_lead_forms", "get_leads", "get_lead"
+            "create_lead_form", "get_lead_form", "list_lead_forms", "get_leads", "get_lead",
+            "create_pixel", "get_pixel", "list_pixels", "update_pixel"
         ]
         error_msg = f"Unknown action: {action}. Supported: {', '.join(supported_actions)}"
         log_info(f"\n✗ {error_msg}")
